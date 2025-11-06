@@ -1,6 +1,7 @@
 package com.gn.pharmacy.service.serviceImpl;
 
 import com.gn.pharmacy.bcrypt.BcryptEncoderConfig;
+import com.gn.pharmacy.dto.request.UserDTO;
 import com.gn.pharmacy.dto.request.UserRequestDto;
 import com.gn.pharmacy.dto.response.UserResponseDto;
 import com.gn.pharmacy.entity.UserEntity;
@@ -49,6 +50,22 @@ public class UserServiceImpl implements UserService {
         log.debug("User saved with ID: {}", savedEntity.getUserId());
         return mapEntityToResponse(savedEntity);
     }
+
+    @Override
+    public UserDTO authenticateUser(String mobile, String password) {
+        // Find user by mobile/phone
+        UserEntity user = userRepository.findByPhone(mobile)
+                .orElseThrow(() -> new RuntimeException("User not found with mobile: " + mobile));
+
+        // Check if password matches using BCrypt
+        if (!bcryptEncoderConfig.matches(password, user.getPassword())) {
+            throw new RuntimeException("Invalid password");
+        }
+
+        // Convert to DTO to e  xclude password
+        return new UserDTO(user);
+    }
+
 
     @Override
     public UserResponseDto getUserById(Long userId) {

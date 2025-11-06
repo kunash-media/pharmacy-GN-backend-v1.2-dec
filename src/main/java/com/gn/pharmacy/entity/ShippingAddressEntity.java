@@ -28,6 +28,9 @@ public class ShippingAddressEntity {
     @Column(name = "shipping_address")
     private String shippingAddress;
 
+    @Column(name = "flat_no")
+    private int flat_no;
+
     @Column(name = "shipping_city")
     private String shippingCity;
 
@@ -37,25 +40,28 @@ public class ShippingAddressEntity {
     @Column(name = "shipping_pincode")
     private String shippingPincode;
 
-    @Column(name = "shipping_country")
-    private String shippingCountry;
+    @Column(name = "near_by")
+    private String nearBy;
+
+    @Column(name = "landmark")
+    private String landmark;
 
     // Default constructor
     public ShippingAddressEntity() {
     }
 
-    // Parameterized constructor
-    public ShippingAddressEntity(UserEntity user, String customerPhone, String customerEmail, String shippingAddress,
-                                 String shippingCity, String shippingState, String shippingPincode,
-                                 String shippingCountry) {
+    public ShippingAddressEntity(Long shippingId, UserEntity user, String customerPhone, String customerEmail, String shippingAddress, int flat_no, String shippingCity, String shippingState, String nearBy, String shippingPincode, String landmark) {
+        this.shippingId = shippingId;
         this.user = user;
         this.customerPhone = customerPhone;
         this.customerEmail = customerEmail;
         this.shippingAddress = shippingAddress;
+        this.flat_no = flat_no;
         this.shippingCity = shippingCity;
         this.shippingState = shippingState;
+        this.nearBy = nearBy;
         this.shippingPincode = shippingPincode;
-        this.shippingCountry = shippingCountry;
+        this.landmark = landmark;
     }
 
     @Override
@@ -135,12 +141,29 @@ public class ShippingAddressEntity {
         this.shippingPincode = shippingPincode;
     }
 
-    public String getShippingCountry() {
-        return shippingCountry;
+
+    public String getNearBy() {
+        return nearBy;
     }
 
-    public void setShippingCountry(String shippingCountry) {
-        this.shippingCountry = shippingCountry;
+    public void setNearBy(String nearBy) {
+        this.nearBy = nearBy;
+    }
+
+    public String getLandmark() {
+        return landmark;
+    }
+
+    public void setLandmark(String landmark) {
+        this.landmark = landmark;
+    }
+
+    public int getFlat_no() {
+        return flat_no;
+    }
+
+    public void setFlat_no(int flat_no) {
+        this.flat_no = flat_no;
     }
 
 }

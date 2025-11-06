@@ -1,5 +1,6 @@
 package com.gn.pharmacy.controller;
-import com.gn.pharmacy.dto.request.BannerTextRequestDto;
+
+import com.gn.pharmacy.dto.request.BannerRequestDto;
 import com.gn.pharmacy.dto.response.BannerResponseDto;
 import com.gn.pharmacy.service.BannerService;
 import org.slf4j.Logger;
@@ -10,167 +11,105 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/banners")
 public class BannerController {
+
     private static final Logger logger = LoggerFactory.getLogger(BannerController.class);
 
     @Autowired
     private BannerService bannerService;
 
-    @PostMapping(value = "/create-banner", consumes = "multipart/form-data")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BannerResponseDto> createBanner(
-            @RequestPart("textData") BannerTextRequestDto textData,
-            @RequestPart(value = "bannerFileOne", required = false) List<MultipartFile> bannerFileOne,
+            @RequestPart("pageName") String pageName,
+            @RequestPart(value = "bannerFileSlides", required = false) List<MultipartFile> bannerFileSlides,
             @RequestPart(value = "bannerFileTwo", required = false) MultipartFile bannerFileTwo,
             @RequestPart(value = "bannerFileThree", required = false) MultipartFile bannerFileThree,
-            @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) {
-        try {
-            logger.info("Received request to create banner for page: {}", textData.getPageName());
-            BannerResponseDto responseDto = bannerService.createBanner(textData, bannerFileOne, bannerFileTwo, bannerFileThree, bannerFileFour);
-            return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
-        } catch (Exception e) {
-            logger.error("Error creating banner: {}", e.getMessage());
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+            @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) throws Exception {
+        logger.info("Received create banner request for page: {}", pageName);
+        BannerRequestDto dto = new BannerRequestDto();
+        dto.setPageName(pageName);
+        BannerResponseDto responseDto = bannerService.createBanner(dto, bannerFileSlides, bannerFileTwo, bannerFileThree, bannerFileFour);
+        return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
     }
 
-    @GetMapping("/get-banner-by-Id/{bannerId}")
-    public ResponseEntity<BannerResponseDto> getBannerById(@PathVariable Long bannerId) {
-        try {
-            logger.info("Fetching banner with ID: {}", bannerId);
-            BannerResponseDto responseDto = bannerService.getBannerById(bannerId);
-            return new ResponseEntity<>(responseDto, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Error fetching banner with ID {}: {}", bannerId, e.getMessage());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    @GetMapping("/get-Banner-By-Id/{id}")
+    public ResponseEntity<BannerResponseDto> getBannerById(@PathVariable Long id) {
+        logger.info("Received get banner request for ID: {}", id);
+        BannerResponseDto dto = bannerService.getBannerById(id);
+        return ResponseEntity.ok(dto);
+    }
+    // =============== NEW API ADDED =================//
+
+    @GetMapping("/get-by-page-name/{pageName}")
+    public ResponseEntity<BannerResponseDto> getBannerByPageName(@PathVariable String pageName) {
+        logger.info("Received request to get banner by page name: {}", pageName);
+        BannerResponseDto dto = bannerService.getBannerByPageName(pageName);
+        return ResponseEntity.ok(dto);
     }
 
-    @GetMapping("/get-all-banners")
+    @GetMapping("/get-All-Banners")
     public ResponseEntity<List<BannerResponseDto>> getAllBanners() {
-        try {
-            logger.info("Fetching all banners");
-            List<BannerResponseDto> banners = bannerService.getAllBanners();
-            return new ResponseEntity<>(banners, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Error fetching all banners: {}", e.getMessage());
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        logger.info("Received get all banners request");
+        List<BannerResponseDto> dtos = bannerService.getAllBanners();
+        return ResponseEntity.ok(dtos);
     }
 
-    @PutMapping(value = "/update-banner-by-bannerId/{bannerId}", consumes = "multipart/form-data")
+    @PatchMapping(value = "/update-Banner/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BannerResponseDto> updateBanner(
-            @PathVariable Long bannerId,
-            @RequestPart("textData") BannerTextRequestDto textData,
-            @RequestPart(value = "bannerFileOne", required = false) List<MultipartFile> bannerFileOne,
+            @PathVariable Long id,
+            @RequestPart(value = "pageName", required = false) String pageName,
+            @RequestPart(value = "bannerFileSlides", required = false) List<MultipartFile> bannerFileSlides,
             @RequestPart(value = "bannerFileTwo", required = false) MultipartFile bannerFileTwo,
             @RequestPart(value = "bannerFileThree", required = false) MultipartFile bannerFileThree,
-            @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) {
-        try {
-            logger.info("Updating banner with ID: {}", bannerId);
-            BannerResponseDto responseDto = bannerService.updateBanner(bannerId, textData, bannerFileOne, bannerFileTwo, bannerFileThree, bannerFileFour);
-            return new ResponseEntity<>(responseDto, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Error updating banner with ID {}: {}", bannerId, e.getMessage());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) throws Exception {
+        logger.info("Received update banner request for ID: {}", id);
+        BannerRequestDto dto = new BannerRequestDto();
+        if (pageName != null) {
+            dto.setPageName(pageName);
         }
+        BannerResponseDto responseDto = bannerService.updateBanner(id, dto, bannerFileSlides, bannerFileTwo, bannerFileThree, bannerFileFour);
+        return ResponseEntity.ok(responseDto);
     }
 
-    @PatchMapping(value = "/patch-banner-by-bannerId/{bannerId}", consumes = "multipart/form-data")
-    public ResponseEntity<BannerResponseDto> patchBanner(
-            @PathVariable Long bannerId,
-            @RequestPart(value = "textData", required = false) BannerTextRequestDto textData,
-            @RequestPart(value = "bannerFileOne", required = false) List<MultipartFile> bannerFileOne,
-            @RequestPart(value = "bannerFileTwo", required = false) MultipartFile bannerFileTwo,
-            @RequestPart(value = "bannerFileThree", required = false) MultipartFile bannerFileThree,
-            @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) {
-        try {
-            logger.info("Patching banner with ID: {}", bannerId);
-            BannerResponseDto responseDto = bannerService.patchBanner(bannerId, textData, bannerFileOne, bannerFileTwo, bannerFileThree, bannerFileFour);
-            return new ResponseEntity<>(responseDto, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Error patching banner with ID {}: {}", bannerId, e.getMessage());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+    @DeleteMapping("/delete-Banner/{id}")
+    public ResponseEntity<Void> deleteBanner(@PathVariable Long id) {
+        logger.info("Received delete banner request for ID: {}", id);
+        bannerService.deleteBanner(id);
+        return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/delete-banner-by-bannerId/{bannerId}")
-    public ResponseEntity<String> deleteBanner(@PathVariable Long bannerId) {
-        try {
-            logger.info("Deleting banner with ID: {}", bannerId);
-            bannerService.deleteBanner(bannerId);
-            return new ResponseEntity<>("Banner Deleted Successfully!! with ID :" + bannerId,HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Error deleting banner with ID {}: {}", bannerId, e.getMessage());
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
+
+    @GetMapping(value = "/get-banner-slide-image/{id}/slides/{index}", produces = MediaType.IMAGE_JPEG_VALUE)
+    public ResponseEntity<byte[]> getBannerSlideImage(@PathVariable Long id, @PathVariable int index) {
+        logger.info("Received get slide image request for banner ID: {} index: {}", id, index);
+        byte[] image = bannerService.getBannerSlideImage(id, index);
+        return ResponseEntity.ok(image);
     }
 
-    // New: Serve subimages from bannerFileOne
-    @GetMapping(value = "/{bannerId}/subimage/{index}", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<byte[]> getSubImage(@PathVariable Long bannerId, @PathVariable int index) {
-        try {
-            logger.info("Fetching subimage {} for banner ID: {}", index, bannerId);
-            byte[] image = bannerService.getSubImage(bannerId, index);
-            if (image == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
-        } catch (Exception e) {
-            logger.error("Error fetching subimage {} for banner {}: {}", index, bannerId, e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
+    @GetMapping(value = "/get-Banner-File-Two-Image/{id}/filetwo", produces = MediaType.IMAGE_JPEG_VALUE)
+    public ResponseEntity<byte[]> getBannerFileTwoImage(@PathVariable Long id) {
+        logger.info("Received get file two image request for banner ID: {}", id);
+        byte[] image = bannerService.getBannerFileTwoImage(id);
+        return ResponseEntity.ok(image);
     }
 
-    // New: Serve bannerFileTwo
-    @GetMapping(value = "/{bannerId}/bannerFileTwo", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<byte[]> getBannerFileTwo(@PathVariable Long bannerId) {
-        try {
-            logger.info("Fetching bannerFileTwo for banner ID: {}", bannerId);
-            byte[] image = bannerService.getBannerFile(bannerId, "two");
-            if (image == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
-        } catch (Exception e) {
-            logger.error("Error fetching bannerFileTwo for banner {}: {}", bannerId, e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
+    @GetMapping(value = "/get-Banner-File-Three-Image/{id}/filethree", produces = MediaType.IMAGE_JPEG_VALUE)
+    public ResponseEntity<byte[]> getBannerFileThreeImage(@PathVariable Long id) {
+        logger.info("Received get file three image request for banner ID: {}", id);
+        byte[] image = bannerService.getBannerFileThreeImage(id);
+        return ResponseEntity.ok(image);
     }
 
-    // New: Serve bannerFileThree
-    @GetMapping(value = "/{bannerId}/bannerFileThree", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<byte[]> getBannerFileThree(@PathVariable Long bannerId) {
-        try {
-            logger.info("Fetching bannerFileThree for banner ID: {}", bannerId);
-            byte[] image = bannerService.getBannerFile(bannerId, "three");
-            if (image == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
-        } catch (Exception e) {
-            logger.error("Error fetching bannerFileThree for banner {}: {}", bannerId, e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
+    @GetMapping(value = "/get-Banner-File-Four-Image/{id}/filefour", produces = MediaType.IMAGE_JPEG_VALUE)
+    public ResponseEntity<byte[]> getBannerFileFourImage(@PathVariable Long id) {
+        logger.info("Received get file four image request for banner ID: {}", id);
+        byte[] image = bannerService.getBannerFileFourImage(id);
+        return ResponseEntity.ok(image);
     }
 
-    // New: Serve bannerFileFour
-    @GetMapping(value = "/{bannerId}/bannerFileFour", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<byte[]> getBannerFileFour(@PathVariable Long bannerId) {
-        try {
-            logger.info("Fetching bannerFileFour for banner ID: {}", bannerId);
-            byte[] image = bannerService.getBannerFile(bannerId, "four");
-            if (image == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(image);
-        } catch (Exception e) {
-            logger.error("Error fetching bannerFileFour for banner {}: {}", bannerId, e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
-    }
+
 }

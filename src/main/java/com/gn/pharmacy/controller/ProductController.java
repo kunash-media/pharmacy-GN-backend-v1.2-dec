@@ -74,13 +74,38 @@ public class ProductController {
         return ResponseEntity.ok(responseDtos);
     }
 
-    @GetMapping("/get-by-category/{category}")
+    @GetMapping("/get-by-category/{productCategory}")
     public ResponseEntity<List<ProductResponseDto>> getProductsByCategory(@PathVariable String productCategory) {
         log.info("Request received to get products by category: {}", productCategory);
-        List<ProductResponseDto> responseDtos = productService.getProductsByCategory(productCategory);
-        log.info("Retrieved {} products for category: {}", responseDtos.size(), productCategory);
-        return ResponseEntity.ok(responseDtos);
+
+        try {
+            // URL decode the category parameter
+            String decodedCategory = java.net.URLDecoder.decode(productCategory, java.nio.charset.StandardCharsets.UTF_8);
+            log.debug("Decoded category: '{}'", decodedCategory);
+
+            if (decodedCategory == null || decodedCategory.trim().isEmpty()) {
+                log.warn("Product category is null or empty after decoding");
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Debug: Check what the service returns
+            List<ProductResponseDto> responseDtos = productService.getProductsByCategory(decodedCategory);
+            log.debug("Service returned {} products", responseDtos.size());
+
+            if (responseDtos.isEmpty()) {
+                log.warn("No products found for category: '{}'. Checking database...", decodedCategory);
+                // Add database check here for debugging
+            }
+
+            log.info("Retrieved {} products for category: {}", responseDtos.size(), decodedCategory);
+            return ResponseEntity.ok(responseDtos);
+
+        } catch (Exception e) {
+            log.error("Error processing category parameter: {}", productCategory, e);
+            return ResponseEntity.badRequest().build();
+        }
     }
+
 
     @GetMapping("/get-by-sub-category/{subCategory}")
     public ResponseEntity<List<ProductResponseDto>> getProductsBySubCategory(@PathVariable String subCategory) {
@@ -179,5 +204,28 @@ public class ProductController {
 
         log.info("Bulk upload completed: {} products uploaded, {} skipped", response.getUploadedCount(), response.getSkippedCount());
         return ResponseEntity.ok(response);
+    }
+
+
+    //=====================================================================
+    //    NEW-PATCH     get-Products-By-Category-Path                        //
+    //=====================================================================
+
+    @GetMapping("/get-category-by-path")
+    public ResponseEntity<List<ProductResponseDto>> getByCategoryPath(@RequestParam List<String> path) {
+        log.info("Fetching products by category path: {}", path);
+        List<ProductResponseDto> products = productService.getProductsByCategoryPath(path);
+        return ResponseEntity.ok(products);
+    }
+
+    //===============================================================
+    //    NEW-PATCH     get-Products-By-Sub-Path                        //
+    //===============================================================
+
+    @GetMapping("/get-category-by-subpath/{subPath}")
+    public ResponseEntity<List<ProductResponseDto>> getBySubPath(@PathVariable String subPath) {
+        log.info("Fetching products under subpath: {}", subPath);
+        List<ProductResponseDto> products = productService.getProductsBySubPath(subPath);
+        return ResponseEntity.ok(products);
     }
 }

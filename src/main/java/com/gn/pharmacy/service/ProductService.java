@@ -31,4 +31,8 @@ public interface ProductService {
     List<ProductResponseDto> getProductsBySubCategory(String subCategory);
 
     BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception;
+
+
+    List<ProductResponseDto> getProductsByCategoryPath(List<String> path);
+    List<ProductResponseDto> getProductsBySubPath(String subPath); // e.g., "Chronic Care"
 }

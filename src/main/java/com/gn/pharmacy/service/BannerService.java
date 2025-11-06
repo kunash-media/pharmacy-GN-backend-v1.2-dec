@@ -1,6 +1,6 @@
 package com.gn.pharmacy.service;
 
-import com.gn.pharmacy.dto.request.BannerTextRequestDto;
+import com.gn.pharmacy.dto.request.BannerRequestDto;
 import com.gn.pharmacy.dto.response.BannerResponseDto;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,19 +8,23 @@ import java.util.List;
 
 public interface BannerService {
 
-    BannerResponseDto createBanner(BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception;
+    BannerResponseDto createBanner(BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception;
 
-    BannerResponseDto getBannerById(Long bannerId) throws Exception;
+    BannerResponseDto getBannerById(Long id);
 
-    List<BannerResponseDto> getAllBanners() throws Exception;
+    List<BannerResponseDto> getAllBanners();
 
-    BannerResponseDto updateBanner(Long bannerId, BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception;
+    BannerResponseDto updateBanner(Long id, BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception;
 
-    BannerResponseDto patchBanner(Long bannerId, BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception;
+    void deleteBanner(Long id);
 
-    void deleteBanner(Long bannerId) throws Exception;
+    byte[] getBannerSlideImage(Long id, int index);
 
-    byte[] getSubImage(Long bannerId, int index) throws Exception;
+    byte[] getBannerFileTwoImage(Long id);
 
-    byte[] getBannerFile(Long bannerId, String type) throws Exception;
+    byte[] getBannerFileThreeImage(Long id);
+
+    byte[] getBannerFileFourImage(Long id);
+
+    BannerResponseDto getBannerByPageName(String pageName);
 }

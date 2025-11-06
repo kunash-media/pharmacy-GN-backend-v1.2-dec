@@ -1,5 +1,6 @@
 package com.gn.pharmacy.controller;
 
+import com.gn.pharmacy.dto.request.UserDTO;
 import com.gn.pharmacy.dto.request.UserRequestDto;
 import com.gn.pharmacy.dto.response.UserResponseDto;
 import com.gn.pharmacy.service.UserService;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -40,6 +42,21 @@ public class UserController {
         log.info("User created successfully with ID: {}", response.getUserId());
         return ResponseEntity.ok(response);
     }
+
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestParam("mobile") String mobile,
+                                   @RequestParam("password") String password) {
+        try {
+            UserDTO user = userService.authenticateUser(mobile, password);
+            // Make sure your UserDTO includes the password field
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
 
     @GetMapping("/get-by-user-id/{userId}")
     public ResponseEntity<UserResponseDto> getUser(@PathVariable Long userId) {

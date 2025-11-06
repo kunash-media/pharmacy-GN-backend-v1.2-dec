@@ -1,5 +1,7 @@
 package com.gn.pharmacy.service.serviceImpl;
-import com.gn.pharmacy.dto.request.BannerTextRequestDto;
+
+
+import com.gn.pharmacy.dto.request.BannerRequestDto;
 import com.gn.pharmacy.dto.response.BannerResponseDto;
 import com.gn.pharmacy.entity.BannerEntity;
 import com.gn.pharmacy.repository.BannerRepository;
@@ -13,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,210 +27,199 @@ public class BannerServiceImpl implements BannerService {
     private BannerRepository bannerRepository;
 
     @Override
-    public BannerResponseDto createBanner(BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+    public BannerResponseDto createBanner(BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+        logger.info("Creating banner for page: {}", dto.getPageName());
 
-        logger.info("Creating new banner for page: {}", textData.getPageName());
         BannerEntity entity = new BannerEntity();
-        entity.setPageName(textData.getPageName());
-        entity.setHeader(textData.getHeader());
-        entity.setText(textData.getText());
+        entity.setPageName(dto.getPageName());
 
-        // Handle file uploads
-        List<byte[]> bannerFileOneBytes = new ArrayList<>();
-        if (bannerFileOne != null) {
-            for (var file : bannerFileOne) {
-                if (file != null && !file.isEmpty()) {
-                    bannerFileOneBytes.add(file.getBytes());
+        List<byte[]> slidesBytes = new ArrayList<>();
+        if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
+            for (MultipartFile file : bannerFileSlides) {
+                if (!file.isEmpty()) {
+                    slidesBytes.add(file.getBytes());
                 }
             }
         }
-        entity.setBannerFileOne(bannerFileOneBytes);
+        entity.setBannerFileSlides(slidesBytes);
 
         if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
             entity.setBannerFileTwo(bannerFileTwo.getBytes());
         }
+
         if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
             entity.setBannerFileThree(bannerFileThree.getBytes());
         }
+
         if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
             entity.setBannerFileFour(bannerFileFour.getBytes());
         }
 
         BannerEntity savedEntity = bannerRepository.save(entity);
         logger.info("Banner created with ID: {}", savedEntity.getBannerId());
+
         return convertToResponseDto(savedEntity);
     }
 
+
     @Override
-    public BannerResponseDto getBannerById(Long bannerId) throws Exception {
-        logger.info("Fetching banner with ID: {}", bannerId);
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
-        return convertToResponseDto(entity);
+    public BannerResponseDto getBannerByPageName(String pageName) {
+        logger.info("Fetching banner for page name: {}", pageName);
+        return bannerRepository.findByPageName(pageName)
+                .map(this::convertToResponseDto)
+                .orElseThrow(() -> {
+                    logger.warn("Banner not found for page name: {}", pageName);
+                    return new RuntimeException("Banner not found for page name: " + pageName);
+                });
+    }
+
+
+
+
+    @Override
+    public BannerResponseDto getBannerById(Long id) {
+        logger.info("Fetching banner with ID: {}", id);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            return convertToResponseDto(optionalEntity.get());
+        } else {
+            logger.warn("Banner not found with ID: {}", id);
+            throw new RuntimeException("Banner not found");
+        }
     }
 
     @Override
     public List<BannerResponseDto> getAllBanners() {
         logger.info("Fetching all banners");
-        return bannerRepository.findAll().stream()
-                .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
+        List<BannerEntity> entities = bannerRepository.findAll();
+        List<BannerResponseDto> dtos = new ArrayList<>();
+        for (BannerEntity entity : entities) {
+            dtos.add(convertToResponseDto(entity));
+        }
+        return dtos;
     }
 
     @Override
-    public BannerResponseDto updateBanner(Long bannerId, BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
-        logger.info("Updating banner with ID: {}", bannerId);
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
+    public BannerResponseDto updateBanner(Long id, BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+        logger.info("Updating banner with ID: {}", id);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            BannerEntity entity = optionalEntity.get();
 
-        entity.setPageName(textData.getPageName());
-        entity.setHeader(textData.getHeader());
-        entity.setText(textData.getText());
-
-        // Handle file updates
-        List<byte[]> bannerFileOneBytes = new ArrayList<>();
-        if (bannerFileOne != null) {
-            for (var file : bannerFileOne) {
-                if (file != null && !file.isEmpty()) {
-                    bannerFileOneBytes.add(file.getBytes());
-                }
+            if (dto.getPageName() != null) {
+                entity.setPageName(dto.getPageName());
             }
-        }
-        entity.setBannerFileOne(bannerFileOneBytes);
 
-        if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
-            entity.setBannerFileTwo(bannerFileTwo.getBytes());
-        } else {
-            entity.setBannerFileTwo(null); // Allow clearing the file
-        }
-        if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
-            entity.setBannerFileThree(bannerFileThree.getBytes());
-        } else {
-            entity.setBannerFileThree(null); // Allow clearing the file
-        }
-        if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
-            entity.setBannerFileFour(bannerFileFour.getBytes());
-        } else {
-            entity.setBannerFileFour(null); // Allow clearing the file
-        }
-
-        BannerEntity updatedEntity = bannerRepository.save(entity);
-        logger.info("Banner updated with ID: {}", updatedEntity.getBannerId());
-        return convertToResponseDto(updatedEntity);
-    }
-
-    @Override
-    public BannerResponseDto patchBanner(Long bannerId, BannerTextRequestDto textData, List<MultipartFile> bannerFileOne, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
-        logger.info("Patching banner with ID: {}", bannerId);
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
-
-        // Partial update: Only set if provided
-        if (textData != null) {
-            if (textData.getPageName() != null) entity.setPageName(textData.getPageName());
-            if (textData.getHeader() != null) entity.setHeader(textData.getHeader());
-            if (textData.getText() != null) entity.setText(textData.getText());
-        }
-
-        // Partial file updates
-        if (bannerFileOne != null) {
-            List<byte[]> bannerFileOneBytes = new ArrayList<>();
-            for (var file : bannerFileOne) {
-                if (file != null && !file.isEmpty()) {
-                    bannerFileOneBytes.add(file.getBytes());
+            if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
+                List<byte[]> slidesBytes = new ArrayList<>();
+                for (MultipartFile file : bannerFileSlides) {
+                    if (!file.isEmpty()) {
+                        slidesBytes.add(file.getBytes());
+                    }
                 }
+                entity.setBannerFileSlides(slidesBytes);
             }
-            entity.setBannerFileOne(bannerFileOneBytes);
-        }
 
-        if (bannerFileTwo != null) {
-            if (!bannerFileTwo.isEmpty()) {
+            if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
                 entity.setBannerFileTwo(bannerFileTwo.getBytes());
-            } else {
-                entity.setBannerFileTwo(null); // Clear if empty file sent
             }
-        }
-        if (bannerFileThree != null) {
-            if (!bannerFileThree.isEmpty()) {
-                entity.setBannerFileThree(bannerFileThree.getBytes());
-            } else {
-                entity.setBannerFileThree(null);
-            }
-        }
-        if (bannerFileFour != null) {
-            if (!bannerFileFour.isEmpty()) {
-                entity.setBannerFileFour(bannerFileFour.getBytes());
-            } else {
-                entity.setBannerFileFour(null);
-            }
-        }
 
-        BannerEntity updatedEntity = bannerRepository.save(entity);
-        logger.info("Banner patched with ID: {}", updatedEntity.getBannerId());
-        return convertToResponseDto(updatedEntity);
+            if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
+                entity.setBannerFileThree(bannerFileThree.getBytes());
+            }
+
+            if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
+                entity.setBannerFileFour(bannerFileFour.getBytes());
+            }
+
+            BannerEntity updatedEntity = bannerRepository.save(entity);
+            logger.info("Banner updated with ID: {}", updatedEntity.getBannerId());
+            return convertToResponseDto(updatedEntity);
+        } else {
+            logger.warn("Banner not found for update with ID: {}", id);
+            throw new RuntimeException("Banner not found");
+        }
     }
 
     @Override
-    public void deleteBanner(Long bannerId) throws Exception {
-        logger.info("Deleting banner with ID: {}", bannerId);
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
-        bannerRepository.delete(entity);
-        logger.info("Banner deleted with ID: {}", bannerId);
+    public void deleteBanner(Long id) {
+        logger.info("Deleting banner with ID: {}", id);
+        bannerRepository.deleteById(id);
     }
 
-    // New: Get subimage by index
-    public byte[] getSubImage(Long bannerId, int index) throws Exception {
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
-        List<byte[]> files = entity.getBannerFileOne();
-        if (index < 0 || index >= files.size() || files.get(index) == null) {
-            return null;
+    @Override
+    public byte[] getBannerSlideImage(Long id, int index) {
+        logger.info("Fetching slide image for banner ID: {} at index: {}", id, index);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            List<byte[]> slides = optionalEntity.get().getBannerFileSlides();
+            if (index >= 0 && index < slides.size()) {
+                return slides.get(index);
+            } else {
+                throw new RuntimeException("Invalid slide index");
+            }
+        } else {
+            throw new RuntimeException("Banner not found");
         }
-        return files.get(index);
     }
 
-    // New: Get single banner file by type
-    public byte[] getBannerFile(Long bannerId, String type) throws Exception {
-        BannerEntity entity = bannerRepository.findById(bannerId)
-                .orElseThrow(() -> new Exception("Banner not found with ID: " + bannerId));
-        return switch (type) {
-            case "two" -> entity.getBannerFileTwo();
-            case "three" -> entity.getBannerFileThree();
-            case "four" -> entity.getBannerFileFour();
-            default -> null;
-        };
+    @Override
+    public byte[] getBannerFileTwoImage(Long id) {
+        logger.info("Fetching file two image for banner ID: {}", id);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            return optionalEntity.get().getBannerFileTwo();
+        } else {
+            throw new RuntimeException("Banner not found");
+        }
+    }
+
+    @Override
+    public byte[] getBannerFileThreeImage(Long id) {
+        logger.info("Fetching file three image for banner ID: {}", id);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            return optionalEntity.get().getBannerFileThree();
+        } else {
+            throw new RuntimeException("Banner not found");
+        }
+    }
+
+    @Override
+    public byte[] getBannerFileFourImage(Long id) {
+        logger.info("Fetching file four image for banner ID: {}", id);
+        Optional<BannerEntity> optionalEntity = bannerRepository.findById(id);
+        if (optionalEntity.isPresent()) {
+            return optionalEntity.get().getBannerFileFour();
+        } else {
+            throw new RuntimeException("Banner not found");
+        }
     }
 
     private BannerResponseDto convertToResponseDto(BannerEntity entity) {
-        BannerResponseDto responseDto = new BannerResponseDto();
-        responseDto.setBannerId(entity.getBannerId());
-        responseDto.setPageName(entity.getPageName());
-        responseDto.setHeader(entity.getHeader());
-        responseDto.setText(entity.getText());
+        BannerResponseDto dto = new BannerResponseDto();
+        dto.setId(entity.getBannerId());
+        dto.setPageName(entity.getPageName());
 
-        // Generate URLs instead of Base64
-        List<String> bannerFileOneUrls = new ArrayList<>();
-        if (entity.getBannerFileOne() != null) {
-            for (int i = 0; i < entity.getBannerFileOne().size(); i++) {
-                if (entity.getBannerFileOne().get(i) != null) {
-                    bannerFileOneUrls.add("/api/banners/" + entity.getBannerId() + "/subimage/" + i);
-                }
-            }
+        List<String> slideLinks = new ArrayList<>();
+        for (int i = 0; i < entity.getBannerFileSlides().size(); i++) {
+            slideLinks.add("/api/banners/" + entity.getBannerId() + "/slides/" + i);
         }
-        responseDto.setBannerFileOne(bannerFileOneUrls);
+        dto.setBannerFileSlides(slideLinks);
 
-        Long id = entity.getBannerId();
         if (entity.getBannerFileTwo() != null) {
-            responseDto.setBannerFileTwo("/api/banners/" + id + "/bannerFileTwo");
-        }
-        if (entity.getBannerFileThree() != null) {
-            responseDto.setBannerFileThree("/api/banners/" + id + "/bannerFileThree");
-        }
-        if (entity.getBannerFileFour() != null) {
-            responseDto.setBannerFileFour("/api/banners/" + id + "/bannerFileFour");
+            dto.setBannerFileTwo("/api/banners/" + entity.getBannerId() + "/filetwo");
         }
 
-        return responseDto;
+        if (entity.getBannerFileThree() != null) {
+            dto.setBannerFileThree("/api/banners/" + entity.getBannerId() + "/filethree");
+        }
+
+        if (entity.getBannerFileFour() != null) {
+            dto.setBannerFileFour("/api/banners/" + entity.getBannerId() + "/filefour");
+        }
+
+        return dto;
     }
 }
+

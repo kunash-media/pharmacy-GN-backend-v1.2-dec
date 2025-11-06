@@ -38,9 +38,10 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getAllOrders(pageable));
     }
 
-    @PutMapping("update-by-order-id/{orderId}")
-    public ResponseEntity<OrderResponseDto> updateOrder(@PathVariable Long orderId,
-                                                        @RequestBody OrderRequestDto orderRequestDto) {
+    @PutMapping("/update-by-order-id/{orderId}")
+    public ResponseEntity<OrderResponseDto> updateOrder(
+            @PathVariable Long orderId,
+            @RequestBody OrderRequestDto orderRequestDto) {
         return ResponseEntity.ok(orderService.updateOrder(orderId, orderRequestDto));
     }
 

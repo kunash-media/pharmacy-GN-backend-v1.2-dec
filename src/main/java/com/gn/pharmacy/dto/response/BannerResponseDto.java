@@ -1,44 +1,66 @@
 package com.gn.pharmacy.dto.response;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class BannerResponseDto {
 
-    private Long bannerId;
+    private Long id;
+
     private String pageName;
-    private String header;
-    private String text;
-    private List<String> bannerFileOne = new ArrayList<>(); // URLs
-    private String bannerFileTwo; // URL
-    private String bannerFileThree; // URL
-    private String bannerFileFour; // URL
 
-    // Default constructor
-    public BannerResponseDto() {}
+    private List<String> bannerFileSlides;
 
-    // Getters and setters (updated for URLs)
-    public Long getBannerId() { return bannerId; }
-    public void setBannerId(Long bannerId) { this.bannerId = bannerId; }
+    private String bannerFileTwo;
 
-    public String getPageName() { return pageName; }
-    public void setPageName(String pageName) { this.pageName = pageName; }
+    private String bannerFileThree;
 
-    public String getHeader() { return header; }
-    public void setHeader(String header) { this.header = header; }
+    private String bannerFileFour;
 
-    public String getText() { return text; }
-    public void setText(String text) { this.text = text; }
+    public Long getId() {
+        return id;
+    }
 
-    public List<String> getBannerFileOne() { return bannerFileOne; }
-    public void setBannerFileOne(List<String> bannerFileOne) { this.bannerFileOne = bannerFileOne; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getBannerFileTwo() { return bannerFileTwo; }
-    public void setBannerFileTwo(String bannerFileTwo) { this.bannerFileTwo = bannerFileTwo; }
+    public String getPageName() {
+        return pageName;
+    }
 
-    public String getBannerFileThree() { return bannerFileThree; }
-    public void setBannerFileThree(String bannerFileThree) { this.bannerFileThree = bannerFileThree; }
+    public void setPageName(String pageName) {
+        this.pageName = pageName;
+    }
 
-    public String getBannerFileFour() { return bannerFileFour; }
-    public void setBannerFileFour(String bannerFileFour) { this.bannerFileFour = bannerFileFour; }
+    public List<String> getBannerFileSlides() {
+        return bannerFileSlides;
+    }
+
+    public void setBannerFileSlides(List<String> bannerFileSlides) {
+        this.bannerFileSlides = bannerFileSlides;
+    }
+
+    public String getBannerFileTwo() {
+        return bannerFileTwo;
+    }
+
+    public void setBannerFileTwo(String bannerFileTwo) {
+        this.bannerFileTwo = bannerFileTwo;
+    }
+
+    public String getBannerFileThree() {
+        return bannerFileThree;
+    }
+
+    public void setBannerFileThree(String bannerFileThree) {
+        this.bannerFileThree = bannerFileThree;
+    }
+
+    public String getBannerFileFour() {
+        return bannerFileFour;
+    }
+
+    public void setBannerFileFour(String bannerFileFour) {
+        this.bannerFileFour = bannerFileFour;
+    }
 }

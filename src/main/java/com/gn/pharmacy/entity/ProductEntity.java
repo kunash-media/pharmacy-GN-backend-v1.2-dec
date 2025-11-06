@@ -66,6 +66,12 @@ public class ProductEntity {
     private String batchNo;
 
 
+    // NEW: Hierarchical path
+    @ElementCollection
+    @CollectionTable(name = "category_path_products", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "category_path")
+    private List<String> categoryPath = new ArrayList<>();
+
     //NEW ADDED COLUMN
     @ElementCollection
     @CollectionTable(name = "product_benefits", joinColumns = @JoinColumn(name = "product_id"))
@@ -74,9 +80,9 @@ public class ProductEntity {
 
     //NEW ADDED COLUMN
     @ElementCollection
-    @CollectionTable(name = "product_directions", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "directions_list")
-    private List<String> directionsList = new ArrayList<>();
+    @CollectionTable(name = "product_ingredients", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "ingredients_list")
+    private List<String> ingredientsList = new ArrayList<>();
 
 
     @Lob
@@ -107,8 +113,9 @@ public class ProductEntity {
                          BigDecimal productPrice, BigDecimal productOldPrice, String productStock,
                          String productStatus, String productDescription, LocalDateTime createdAt,
                          Integer productQuantity, boolean prescriptionRequired, String brandName,
-                         String mfgDate, String expDate, String batchNo, List<String> benefitsList,
-                         List<String> directionsList, byte[] productMainImage, List<byte[]> productSubImages,
+                         String mfgDate, String expDate, String batchNo, List<String> categoryPath,
+                         List<String> benefitsList, List<String> ingredientsList,
+                         byte[] productMainImage, List<byte[]> productSubImages,
                          Map<String, String> productDynamicFields, List<String> productSizes) {
         this.productId = productId;
         this.productName = productName;
@@ -126,8 +133,9 @@ public class ProductEntity {
         this.mfgDate = mfgDate;
         this.expDate = expDate;
         this.batchNo = batchNo;
+        this.categoryPath = categoryPath;
         this.benefitsList = benefitsList;
-        this.directionsList = directionsList;
+        this.ingredientsList = ingredientsList;
         this.productMainImage = productMainImage;
         this.productSubImages = productSubImages;
         this.productDynamicFields = productDynamicFields;
@@ -306,11 +314,19 @@ public class ProductEntity {
         this.benefitsList = benefitsList;
     }
 
-    public List<String> getDirectionsList() {
-        return directionsList;
+    public List<String> getIngredientsList() {
+        return ingredientsList;
     }
 
-    public void setDirectionsList(List<String> directionsList) {
-        this.directionsList = directionsList;
+    public void setIngredientsList(List<String> ingredientsList) {
+        this.ingredientsList = ingredientsList;
+    }
+
+    public List<String> getCategoryPath() {
+        return categoryPath;
+    }
+
+    public void setCategoryPath(List<String> categoryPath) {
+        this.categoryPath = categoryPath;
     }
 }

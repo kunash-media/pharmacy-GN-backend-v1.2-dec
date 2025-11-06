@@ -7,27 +7,28 @@ public class ShippingAddressResponseDto {
     private String customerPhone;
     private String customerEmail;
     private String shippingAddress;
+    private Integer flat_no;
     private String shippingCity;
     private String shippingState;
     private String shippingPincode;
-    private String shippingCountry;
+    private String nearBy;
+    private String landmark;
 
     // Default constructor
     public ShippingAddressResponseDto() {}
 
-    // Parameterized constructor
-    public ShippingAddressResponseDto(Long shippingId, UserDto user, String customerPhone,
-                                      String customerEmail, String shippingAddress, String shippingCity,
-                                      String shippingState, String shippingPincode, String shippingCountry) {
+    public ShippingAddressResponseDto(Long shippingId, UserDto user, String customerPhone, String customerEmail, String shippingAddress, Integer flat_no, String shippingCity, String shippingState, String shippingPincode, String nearBy, String landmark) {
         this.shippingId = shippingId;
         this.user = user;
         this.customerPhone = customerPhone;
         this.customerEmail = customerEmail;
         this.shippingAddress = shippingAddress;
+        this.flat_no = flat_no;
         this.shippingCity = shippingCity;
         this.shippingState = shippingState;
         this.shippingPincode = shippingPincode;
-        this.shippingCountry = shippingCountry;
+        this.nearBy = nearBy;
+        this.landmark = landmark;
     }
 
     // Inner class for User
@@ -56,6 +57,13 @@ public class ShippingAddressResponseDto {
     }
 
     // Getters and Setters
+
+    public String getNearBy() { return nearBy; }
+    public void setNearBy(String nearBy) { this.nearBy = nearBy; }
+
+    public String getLandmark() { return landmark; }
+    public void setLandmark(String landmark) { this.landmark = landmark; }
+
     public Long getShippingId() { return shippingId; }
     public void setShippingId(Long shippingId) { this.shippingId = shippingId; }
 
@@ -80,6 +88,11 @@ public class ShippingAddressResponseDto {
     public String getShippingPincode() { return shippingPincode; }
     public void setShippingPincode(String shippingPincode) { this.shippingPincode = shippingPincode; }
 
-    public String getShippingCountry() { return shippingCountry; }
-    public void setShippingCountry(String shippingCountry) { this.shippingCountry = shippingCountry; }
+    public Integer getFlat_no() {
+        return flat_no;
+    }
+
+    public void setFlat_no(Integer flat_no) {
+        this.flat_no = flat_no;
+    }
 }

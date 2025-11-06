@@ -9,6 +9,7 @@ import com.gn.pharmacy.service.ShippingAddressService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,10 +38,47 @@ public class ShippingAddressServiceImpl implements ShippingAddressService {
         addressDTO.setShippingId(addressEntity.getShippingId());
         return addressDTO;
     }
-
     @Override
     public List<ShippingAddressDTO> getAddressesByUserId(Long userId) {
-        return addressRepository.findByUserUserId(userId).stream()
+        System.out.println("=== DEBUG: getAddressesByUserId called ===");
+        System.out.println("User ID: " + userId);
+
+        // Check if user exists
+        boolean userExists = userRepository.existsById(userId);
+        System.out.println("User exists: " + userExists);
+
+        if (!userExists) {
+            System.out.println("ERROR: User not found with ID: " + userId);
+            return new ArrayList<>();
+        }
+
+        // Get addresses using different methods to test
+        List<ShippingAddressEntity> addresses = addressRepository.findByUserUserId(userId);
+        System.out.println("Addresses found with findByUserUserId: " + addresses.size());
+
+        // Alternative approach - check if this works
+        UserEntity user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            List<ShippingAddressEntity> addressesAlt = addressRepository.findByUser(user);
+            System.out.println("Addresses found with findByUser: " + addressesAlt.size());
+
+            // Also try manual query
+            List<ShippingAddressEntity> addressesManual = addressRepository.findAll().stream()
+                    .filter(addr -> addr.getUser() != null && addr.getUser().getUserId().equals(userId))
+                    .collect(Collectors.toList());
+            System.out.println("Addresses found manually: " + addressesManual.size());
+        }
+
+        // Log the actual address entities
+        if (!addresses.isEmpty()) {
+            System.out.println("Address details:");
+            for (ShippingAddressEntity addr : addresses) {
+                System.out.println(" - ID: " + addr.getShippingId() + ", User: " +
+                        (addr.getUser() != null ? addr.getUser().getUserId() : "null"));
+            }
+        }
+
+        return addresses.stream()
                 .map(addressEntity -> {
                     ShippingAddressDTO dto = new ShippingAddressDTO();
                     BeanUtils.copyProperties(addressEntity, dto);
@@ -88,8 +126,15 @@ public class ShippingAddressServiceImpl implements ShippingAddressService {
         if (addressDTO.getShippingPincode() != null) {
             addressEntity.setShippingPincode(addressDTO.getShippingPincode());
         }
-        if (addressDTO.getShippingCountry() != null) {
-            addressEntity.setShippingCountry(addressDTO.getShippingCountry());
+        if (addressDTO.getFlat_no() != null) {
+            addressEntity.setFlat_no(addressDTO.getFlat_no());
+        }
+
+        if (addressDTO.getNearBy() != null) {
+            addressEntity.setNearBy(addressDTO.getNearBy());
+        }
+        if (addressDTO.getLandmark() != null) {
+            addressEntity.setLandmark(addressDTO.getLandmark());
         }
 
         addressEntity = addressRepository.save(addressEntity);

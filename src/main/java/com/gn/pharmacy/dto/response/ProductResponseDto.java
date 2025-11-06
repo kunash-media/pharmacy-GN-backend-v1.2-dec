@@ -32,7 +32,10 @@ public class ProductResponseDto {
     private String expDate;
     private String batchNo;
     private List<String> benefitsList = new ArrayList<>();
-    private List<String> directionsList = new ArrayList<>();
+    private List<String> ingredientsList = new ArrayList<>();
+
+
+    private List<String> categoryPath;
 
     // Default constructor
     public ProductResponseDto() {}
@@ -206,11 +209,20 @@ public class ProductResponseDto {
         this.benefitsList = benefitsList;
     }
 
-    public List<String> getDirectionsList() {
-        return directionsList;
+    public List<String> getIngredientsList() {
+        return ingredientsList;
     }
 
-    public void setDirectionsList(List<String> directionsList) {
-        this.directionsList = directionsList;
+    public void setIngredientsList(List<String> ingredientsList) {
+        this.ingredientsList = ingredientsList;
+    }
+
+
+    public List<String> getCategoryPath() {
+        return categoryPath;
+    }
+
+    public void setCategoryPath(List<String> categoryPath) {
+        this.categoryPath = categoryPath;
     }
 }

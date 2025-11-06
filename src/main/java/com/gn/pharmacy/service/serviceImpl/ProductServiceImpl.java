@@ -42,6 +42,13 @@ public class ProductServiceImpl implements ProductService {
         entity.setProductName(requestDto.getProductName());
         entity.setProductCategory(requestDto.getProductCategory());
         entity.setProductSubCategory(requestDto.getProductSubCategory());
+
+        // NEW: Auto-build categoryPath
+        List<String> path = requestDto.getCategoryPath() != null
+                ? new ArrayList<>(requestDto.getCategoryPath())
+                : buildCategoryPath(requestDto.getProductSubCategory());
+        entity.setCategoryPath(path);
+
         entity.setProductPrice(requestDto.getProductPrice());
         entity.setProductOldPrice(requestDto.getProductOldPrice());
         entity.setProductStock(requestDto.getProductStock());
@@ -57,7 +64,8 @@ public class ProductServiceImpl implements ProductService {
         entity.setExpDate(requestDto.getExpDate());
         entity.setBatchNo(requestDto.getBatchNo());
         entity.setBenefitsList(requestDto.getBenefitsList());
-        entity.setDirectionsList(requestDto.getDirectionsList());
+        entity.setIngredientsList(requestDto.getIngredientsList());
+
 
         entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
 
@@ -131,6 +139,35 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+    // HELPER: Build categoryPath from subCategory (e.g., "Chronic Care > Diabetes" → ["Chronic Care", "Diabetes"])
+    private List<String> buildCategoryPath(String subCategory) {
+        if (subCategory == null || subCategory.trim().isEmpty()) return new ArrayList<>();
+        return Arrays.stream(subCategory.split(">"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    //=====================================================================
+    //    NEW-PATCH      getProductsByCategoryPath                        //
+    //=====================================================================
+    @Override
+    public List<ProductResponseDto> getProductsByCategoryPath(List<String> path) {
+        if (path == null || path.isEmpty()) return new ArrayList<>();
+        List<ProductEntity> products = productRepository.findByCategoryPath(path, path.size());
+        return products.stream().map(this::mapToResponseDto).collect(Collectors.toList());
+    }
+
+    //=====================================================================
+    //    NEW-PATCH     getProductsBySubPath                        //
+    //=====================================================================
+    @Override
+    public List<ProductResponseDto> getProductsBySubPath(String subPath) {
+        if (subPath == null || subPath.trim().isEmpty()) return new ArrayList<>();
+        List<ProductEntity> products = productRepository.findByCategoryPathContaining(subPath.trim());
+        return products.stream().map(this::mapToResponseDto).collect(Collectors.toList());
+    }
+
     @Override
     public ProductResponseDto updateProduct(Long id, ProductRequestDto requestDto) throws Exception {
         log.debug("Updating product with ID: {}", id);
@@ -157,7 +194,7 @@ public class ProductServiceImpl implements ProductService {
         entity.setExpDate(requestDto.getExpDate());
         entity.setBatchNo(requestDto.getBatchNo());
         entity.setBenefitsList(requestDto.getBenefitsList());
-        entity.setDirectionsList(requestDto.getDirectionsList());
+        entity.setIngredientsList(requestDto.getIngredientsList());
 
         entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
 
@@ -183,6 +220,16 @@ public class ProductServiceImpl implements ProductService {
             entity.setProductSizes(requestDto.getProductSizes());
         }
 
+        if (requestDto.getProductCategory() != null) entity.setProductCategory(requestDto.getProductCategory());
+        if (requestDto.getProductSubCategory() != null) {
+            entity.setProductSubCategory(requestDto.getProductSubCategory());
+            // Rebuild path
+            entity.setCategoryPath(buildCategoryPath(requestDto.getProductSubCategory()));
+        }
+        if (requestDto.getCategoryPath() != null) {
+            entity.setCategoryPath(new ArrayList<>(requestDto.getCategoryPath()));
+        }
+
         ProductEntity updatedEntity = productRepository.save(entity);
         log.debug("Product updated successfully with ID: {}", id);
         return mapToResponseDto(updatedEntity);
@@ -200,7 +247,17 @@ public class ProductServiceImpl implements ProductService {
 
         if (requestDto.getProductName() != null) entity.setProductName(requestDto.getProductName());
         if (requestDto.getProductCategory() != null) entity.setProductCategory(requestDto.getProductCategory());
-        if (requestDto.getProductSubCategory() != null) entity.setProductSubCategory(requestDto.getProductSubCategory());
+
+        if (requestDto.getProductSubCategory() != null) {
+            entity.setProductSubCategory(requestDto.getProductSubCategory());
+            // Rebuild path
+            entity.setCategoryPath(buildCategoryPath(requestDto.getProductSubCategory()));
+        }
+        if (requestDto.getCategoryPath() != null) {
+            entity.setCategoryPath(new ArrayList<>(requestDto.getCategoryPath()));
+        }
+
+
         if (requestDto.getProductPrice() != null) entity.setProductPrice(requestDto.getProductPrice());
         if (requestDto.getProductOldPrice() != null) entity.setProductOldPrice(requestDto.getProductOldPrice());
         if (requestDto.getProductStock() != null) entity.setProductStock(requestDto.getProductStock());
@@ -215,7 +272,7 @@ public class ProductServiceImpl implements ProductService {
         if (requestDto.getExpDate() != null) entity.setExpDate(requestDto.getExpDate());
         if (requestDto.getBatchNo() != null) entity.setBatchNo(requestDto.getBatchNo());
         if (requestDto.getBenefitsList() != null && !requestDto.getBenefitsList().isEmpty()) entity.setBenefitsList(requestDto.getBenefitsList());
-        if (requestDto.getDirectionsList() != null && !requestDto.getDirectionsList().isEmpty()) entity.setDirectionsList(requestDto.getDirectionsList());
+        if (requestDto.getIngredientsList() != null && !requestDto.getIngredientsList().isEmpty()) entity.setIngredientsList(requestDto.getIngredientsList());
 
         if (requestDto.getProductMainImage() != null) entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
         if (requestDto.getProductSubImages() != null) {
@@ -252,6 +309,7 @@ public class ProductServiceImpl implements ProductService {
         responseDto.setProductName(entity.getProductName());
         responseDto.setProductCategory(entity.getProductCategory());
         responseDto.setProductSubCategory(entity.getProductSubCategory());
+        responseDto.setCategoryPath(new ArrayList<>(entity.getCategoryPath())); // NEW
         responseDto.setProductPrice(entity.getProductPrice());
         responseDto.setProductOldPrice(entity.getProductOldPrice());
         responseDto.setProductStock(entity.getProductStock());
@@ -274,7 +332,7 @@ public class ProductServiceImpl implements ProductService {
         responseDto.setExpDate(entity.getExpDate());
         responseDto.setBatchNo(entity.getBatchNo());
         responseDto.setBenefitsList(entity.getBenefitsList());
-        responseDto.setDirectionsList(entity.getDirectionsList());
+        responseDto.setIngredientsList(entity.getIngredientsList());
 
         return responseDto;
     }
@@ -501,7 +559,7 @@ public class ProductServiceImpl implements ProductService {
                             .filter(s -> !s.isEmpty())
                             .collect(Collectors.toList());
                 }
-                dto.setDirectionsList(directions);
+                dto.setIngredientsList(directions);
 
                 // Create the product using existing createProduct method
                 try {

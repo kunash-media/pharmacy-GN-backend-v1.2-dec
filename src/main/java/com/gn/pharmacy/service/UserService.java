@@ -1,5 +1,6 @@
 package com.gn.pharmacy.service;
 
+import com.gn.pharmacy.dto.request.UserDTO;
 import com.gn.pharmacy.dto.request.UserRequestDto;
 import com.gn.pharmacy.dto.response.UserResponseDto;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,5 +19,8 @@ public interface UserService {
                                                      @RequestBody UserRequestDto userRequestDto);
 
     boolean isEmailExists(String email);
+
+    UserDTO authenticateUser(String mobile, String password);
+
 }
 

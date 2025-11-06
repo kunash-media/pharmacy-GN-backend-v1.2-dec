@@ -123,16 +123,18 @@ public class OrderServiceImpl implements OrderService {
         mapOrderFields(orderRequestDto, orderEntity);
 
         if (orderRequestDto.getOrderItems() != null) {
-            if (orderEntity.getOrderItems() != null) {
-                orderItemRepository.deleteAll(orderEntity.getOrderItems());
-            }
+            // === FIX: Clear the list first ===
+            orderEntity.getOrderItems().clear();
 
+            // Delete old items from DB
+            orderItemRepository.deleteAll(orderEntity.getOrderItems()); // safe: list is now empty
+
+            // Create new items
             List<OrderItemEntity> newOrderItems = orderRequestDto.getOrderItems().stream()
                     .map(itemDto -> createOrderItemEntity(itemDto, orderEntity))
                     .collect(Collectors.toList());
-
             orderItemRepository.saveAll(newOrderItems);
-            orderEntity.setOrderItems(newOrderItems);
+            orderEntity.getOrderItems().addAll(newOrderItems); // re-populate
         }
 
         OrderEntity updatedEntity = orderRepository.save(orderEntity);
@@ -348,4 +350,8 @@ public class OrderServiceImpl implements OrderService {
         logger.info("Order cancelled successfully with ID: {}", orderId);
         return mapToResponseDto(cancelledOrder);
     }
+
+
+
+
 }

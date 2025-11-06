@@ -17,6 +17,10 @@ public class OrderItemEntity {
     @JoinColumn(name = "product_id")
     private ProductEntity product;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mbp_id")
+    private MbPEntity  MbP;
+
     private int quantity;
     private Double itemPrice;
     private Double itemOldPrice;
@@ -26,21 +30,17 @@ public class OrderItemEntity {
     // Constructors
     public OrderItemEntity() {}
 
-    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product,
-                           int quantity, Double itemPrice, Double itemOldPrice,
-                           Double subtotal, String itemName) {
+    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product, MbPEntity mbP, int quantity, Double itemPrice, Double itemOldPrice, Double subtotal, String itemName) {
         this.orderItemId = orderItemId;
         this.order = order;
         this.product = product;
+        this.MbP = mbP;
         this.quantity = quantity;
         this.itemPrice = itemPrice;
         this.itemOldPrice = itemOldPrice;
         this.subtotal = subtotal;
         this.itemName = itemName;
     }
-
-    // Getters and Setters (omitted for brevity, assume standard)
-
 
     public Long getOrderItemId() {
         return orderItemId;
@@ -64,6 +64,14 @@ public class OrderItemEntity {
 
     public void setProduct(ProductEntity product) {
         this.product = product;
+    }
+
+    public MbPEntity getMbP() {
+        return MbP;
+    }
+
+    public void setMbP(MbPEntity mbP) {
+        MbP = mbP;
     }
 
     public int getQuantity() {
