@@ -3673,3 +3673,8 @@
 2025-12-18T11:35:56.240+05:30 DEBUG 17656 --- [Pharmacy] [http-nio-8083-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
 2025-12-18T11:35:56.240+05:30 DEBUG 17656 --- [Pharmacy] [http-nio-8083-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [Page 1 of 1 containing com.gn.pharmacy.dto.response.PrescriptionResponseDTO instances]
 2025-12-18T11:35:56.241+05:30 DEBUG 17656 --- [Pharmacy] [http-nio-8083-exec-3] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2025-12-18T11:46:11.053+05:30  INFO 17656 --- [Pharmacy] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-18T11:46:11.057+05:30  INFO 17656 --- [Pharmacy] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-18T11:46:11.057+05:30  INFO 17656 --- [Pharmacy] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-18T11:46:11.069+05:30  INFO 17656 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-18T11:46:11.069+05:30  INFO 17656 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
