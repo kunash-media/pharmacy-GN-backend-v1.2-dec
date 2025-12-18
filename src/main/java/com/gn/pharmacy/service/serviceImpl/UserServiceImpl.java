@@ -7,7 +7,8 @@ import com.gn.pharmacy.dto.response.UserResponseDto;
 import com.gn.pharmacy.entity.UserEntity;
 import com.gn.pharmacy.repository.UserRepository;
 import com.gn.pharmacy.service.UserService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,14 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
-
 @Service
 @Transactional
-@Slf4j
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final BcryptEncoderConfig bcryptEncoderConfig;
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
     @Autowired
     public UserServiceImpl(UserRepository userRepository, BcryptEncoderConfig bcryptEncoderConfig) {
@@ -37,17 +37,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDto createUser(UserRequestDto userRequestDto) {
-        log.debug("Creating new user with email: {}", userRequestDto.getEmail());
+        logger.debug("Creating new user with email: {}", userRequestDto.getEmail());
 
         // Check if email already exists
         if (userRepository.existsByEmail(userRequestDto.getEmail())) {
-            log.error("Email already exists: {}", userRequestDto.getEmail());
+            logger.error("Email already exists: {}", userRequestDto.getEmail());
             throw new RuntimeException("Email already exists: " + userRequestDto.getEmail());
         }
         UserEntity userEntity = new UserEntity();
         mapRequestToEntity(userRequestDto, userEntity);
         UserEntity savedEntity = userRepository.save(userEntity);
-        log.debug("User saved with ID: {}", savedEntity.getUserId());
+        logger.debug("User saved with ID: {}", savedEntity.getUserId());
         return mapEntityToResponse(savedEntity);
     }
 
@@ -55,24 +55,27 @@ public class UserServiceImpl implements UserService {
     public UserDTO authenticateUser(String mobile, String password) {
         // Find user by mobile/phone
         UserEntity user = userRepository.findByPhone(mobile)
-                .orElseThrow(() -> new RuntimeException("User not found with mobile: " + mobile));
+                .orElseThrow(() -> {
+                    logger.error("User not found with mobile: {}", mobile);
+                    return new RuntimeException("User not found with mobile: " + mobile);
+                });
 
         // Check if password matches using BCrypt
         if (!bcryptEncoderConfig.matches(password, user.getPassword())) {
+            logger.error("Invalid password for user with mobile: {}", mobile);
             throw new RuntimeException("Invalid password");
         }
 
-        // Convert to DTO to e  xclude password
+        logger.debug("User authenticated successfully with mobile: {}", mobile);
         return new UserDTO(user);
     }
 
-
     @Override
     public UserResponseDto getUserById(Long userId) {
-        log.debug("Fetching user by ID: {}", userId);
+        logger.debug("Fetching user by ID: {}", userId);
         UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> {
-                    log.error("User not found with ID: {}", userId);
+                    logger.error("User not found with ID: {}", userId);
                     return new RuntimeException("User not found with ID: " + userId);
                 });
         return mapEntityToResponse(userEntity);
@@ -80,37 +83,36 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponseDto> getAllUsers() {
-        log.debug("Fetching all users");
+        logger.debug("Fetching all users");
         List<UserResponseDto> users = userRepository.findAll().stream()
                 .map(this::mapEntityToResponse)
                 .collect(Collectors.toList());
-        log.debug("Found {} users", users.size());
+        logger.debug("Found {} users", users.size());
         return users;
     }
 
     @Override
     public UserResponseDto updateUser(Long userId, UserRequestDto userRequestDto) {
-        log.debug("Updating user with ID: {}", userId);
+        logger.debug("Updating user with ID: {}", userId);
         UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> {
-                    log.error("User not found with ID: {}", userId);
+                    logger.error("User not found with ID: {}", userId);
                     return new RuntimeException("User not found with ID: " + userId);
                 });
         mapRequestToEntity(userRequestDto, userEntity);
         UserEntity updatedEntity = userRepository.save(userEntity);
-        log.debug("User updated successfully with ID: {}", userId);
+        logger.debug("User updated successfully with ID: {}", userId);
         return mapEntityToResponse(updatedEntity);
     }
 
     @Override
     public UserResponseDto patchUser(Long userId, UserRequestDto userRequestDto) {
-
-        log.debug("Patching user with ID: {}", userId);
+        logger.debug("Patching user with ID: {}", userId);
         UserEntity userEntity = userRepository.findById(userId)
-            .orElseThrow(() -> {
-                log.error("User not found with ID: {}", userId);
-                return new RuntimeException("User not found with ID: " + userId);
-            });
+                .orElseThrow(() -> {
+                    logger.error("User not found with ID: {}", userId);
+                    return new RuntimeException("User not found with ID: " + userId);
+                });
 
         // Only update fields that are not null in the request
         if (userRequestDto.getFirstName() != null) {
@@ -143,23 +145,21 @@ public class UserServiceImpl implements UserService {
         if (userRequestDto.getAddressState() != null) {
             userEntity.setAddressState(userRequestDto.getAddressState());
         }
-        if (userRequestDto.getAddressCountry() != null) {
-            userEntity.setAddressCountry(userRequestDto.getAddressCountry());
-        }
+
         if (userRequestDto.getAddressType() != null) {
             userEntity.setAddressType(userRequestDto.getAddressType());
         }
 
         UserEntity patchedEntity = userRepository.save(userEntity);
-        log.debug("User patched successfully with ID: {}", userId);
+        logger.debug("User patched successfully with ID: {}", userId);
         return mapEntityToResponse(patchedEntity);
     }
 
     @Override
     public void deleteUser(Long userId) {
-        log.debug("Deleting user with ID: {}", userId);
+        logger.debug("Deleting user with ID: {}", userId);
         userRepository.deleteById(userId);
-        log.debug("User deleted successfully with ID: {}", userId);
+        logger.debug("User deleted successfully with ID: {}", userId);
     }
 
     private void mapRequestToEntity(UserRequestDto requestDto, UserEntity entity) {
@@ -180,7 +180,6 @@ public class UserServiceImpl implements UserService {
         entity.setAddressCity(requestDto.getAddressCity());
         entity.setAddressPincode(requestDto.getAddressPincode());
         entity.setAddressState(requestDto.getAddressState());
-        entity.setAddressCountry(requestDto.getAddressCountry());
         entity.setAddressType(requestDto.getAddressType());
     }
 
@@ -197,7 +196,6 @@ public class UserServiceImpl implements UserService {
         responseDto.setAddressCity(entity.getAddressCity());
         responseDto.setAddressPincode(entity.getAddressPincode());
         responseDto.setAddressState(entity.getAddressState());
-        responseDto.setAddressCountry(entity.getAddressCountry());
         responseDto.setAddressType(entity.getAddressType());
         return responseDto;
     }

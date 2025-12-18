@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
@@ -17,23 +18,21 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     boolean existsByProductName(String productName);
 
-    // FIXED: Exact full path match
     @Query(value = """
         SELECT p.* FROM products p
-        JOIN product_category_path cp ON p.product_id = cp.product_id
-        WHERE cp.path IN :path
+        JOIN category_path_products cp ON p.product_id = cp.product_id
+        WHERE cp.category_path IN :path
         GROUP BY p.product_id
-        HAVING COUNT(DISTINCT cp.path) = :pathSize
+        HAVING COUNT(DISTINCT cp.category_path) = :pathSize
         """, nativeQuery = true)
     List<ProductEntity> findByCategoryPath(@Param("path") List<String> path, @Param("pathSize") long pathSize);
 
-    // FIXED: Contains in path (e.g., all under "Chronic Care")
     @Query(value = """
         SELECT DISTINCT p.* FROM products p
-        JOIN product_category_path cp ON p.product_id = cp.product_id
-        WHERE cp.path = :subPath
+        JOIN category_path_products cp ON p.product_id = cp.product_id
+        WHERE cp.category_path = :subPath
         """, nativeQuery = true)
     List<ProductEntity> findByCategoryPathContaining(@Param("subPath") String subPath);
 
-
+    Optional<ProductEntity> findBySku(String sku);
 }

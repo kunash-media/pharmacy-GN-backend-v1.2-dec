@@ -6,7 +6,6 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-
 @Entity
 @Table(name = "prescriptions_orders")
 @Data
@@ -43,6 +42,8 @@ public class PrescriptionEntity {
     @Column(name = "is_approved")
     private boolean isApproved;
 
+    @Column(name = "doctor_name")
+    private String doctorName;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -63,11 +64,10 @@ public class PrescriptionEntity {
     public PrescriptionEntity() {
     }
 
-
     public PrescriptionEntity(String prescriptionId, String firstName, String lastName,
                               String mobileNumber, String email, LocalDateTime createdAt,
                               String orderStatus, byte[] prescriptionImg, String paymentMethod,
-                              boolean isApproved, UserEntity user) {
+                              boolean isApproved, String doctorName, UserEntity user) {
         this.prescriptionId = prescriptionId;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -78,9 +78,9 @@ public class PrescriptionEntity {
         this.prescriptionImg = prescriptionImg;
         this.paymentMethod = paymentMethod;
         this.isApproved = isApproved;
+        this.doctorName = doctorName;
         this.user = user;
     }
-
 
     public String getPrescriptionId() {
         return prescriptionId;
@@ -160,6 +160,14 @@ public class PrescriptionEntity {
 
     public void setApproved(boolean approved) {
         isApproved = approved;
+    }
+
+    public String getDoctorName() {
+        return doctorName;
+    }
+
+    public void setDoctorName(String doctorName) {
+        this.doctorName = doctorName;
     }
 
     public UserEntity getUser() {

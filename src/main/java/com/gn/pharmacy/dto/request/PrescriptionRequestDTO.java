@@ -1,8 +1,6 @@
 package com.gn.pharmacy.dto.request;
 
-
 public class PrescriptionRequestDTO {
-
     private String firstName;
     private String lastName;
     private String mobileNumber;
@@ -10,6 +8,7 @@ public class PrescriptionRequestDTO {
     private String orderStatus;
     private String paymentMethod;
     private boolean isApproved;
+    private String doctorName; // Added field
     private Long userId;
 
     public String getFirstName() {
@@ -66,6 +65,14 @@ public class PrescriptionRequestDTO {
 
     public void setApproved(boolean approved) {
         isApproved = approved;
+    }
+
+    public String getDoctorName() {
+        return doctorName;
+    }
+
+    public void setDoctorName(String doctorName) {
+        this.doctorName = doctorName;
     }
 
     public Long getUserId() {

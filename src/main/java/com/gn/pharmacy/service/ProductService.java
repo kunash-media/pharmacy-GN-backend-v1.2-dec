@@ -14,13 +14,11 @@ public interface ProductService {
 
     ProductResponseDto getProduct(Long productId);
 
-    // ========== UPDATED: Changed return type to Page ==========
     Page<ProductResponseDto> getAllProducts(int page, int size);
-    // ========== END UPDATED ========== //
 
-    // ========== ADDED: New method for get by category ========== //
     List<ProductResponseDto> getProductsByCategory(String category);
-    // ========== END ADDED ========== //
+
+    List<ProductResponseDto> getProductsBySubCategory(String subCategory);
 
     ProductResponseDto updateProduct(Long id, ProductRequestDto requestDto) throws Exception;
 
@@ -28,11 +26,9 @@ public interface ProductService {
 
     void deleteProduct(Long productId);
 
-    List<ProductResponseDto> getProductsBySubCategory(String subCategory);
-
     BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception;
 
-
     List<ProductResponseDto> getProductsByCategoryPath(List<String> path);
-    List<ProductResponseDto> getProductsBySubPath(String subPath); // e.g., "Chronic Care"
+
+    List<ProductResponseDto> getProductsBySubPath(String subPath);
 }

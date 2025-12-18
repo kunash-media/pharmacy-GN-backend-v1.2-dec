@@ -1,11 +1,9 @@
 package com.gn.pharmacy.dto.response;
 
-
 import java.time.LocalDateTime;
 
 public class PrescriptionResponseDTO {
-
-    private String prescriptionId; // Changed from Long
+    private String prescriptionId;
     private String firstName;
     private String lastName;
     private String mobileNumber;
@@ -15,6 +13,7 @@ public class PrescriptionResponseDTO {
     private String imageUrl;
     private String paymentMethod;
     private boolean isApproved;
+    private String doctorName; // Added field
     private Long userId;
 
     public String getPrescriptionId() {
@@ -23,14 +22,6 @@ public class PrescriptionResponseDTO {
 
     public void setPrescriptionId(String prescriptionId) {
         this.prescriptionId = prescriptionId;
-    }
-
-    public boolean isApproved() {
-        return isApproved;
-    }
-
-    public void setApproved(boolean approved) {
-        isApproved = approved;
     }
 
     public String getFirstName() {
@@ -97,6 +88,14 @@ public class PrescriptionResponseDTO {
         this.paymentMethod = paymentMethod;
     }
 
+    public boolean isApproved() {
+        return isApproved;
+    }
+
+    public void setApproved(boolean approved) {
+        isApproved = approved;
+    }
+
     public Boolean getApproved() {
         return isApproved;
     }
@@ -104,6 +103,15 @@ public class PrescriptionResponseDTO {
     public void setApproved(Boolean approved) {
         isApproved = approved;
     }
+
+    public String getDoctorName() {
+        return doctorName;
+    }
+
+    public void setDoctorName(String doctorName) {
+        this.doctorName = doctorName;
+    }
+
     public Long getUserId() {
         return userId;
     }
@@ -111,6 +119,4 @@ public class PrescriptionResponseDTO {
     public void setUserId(Long userId) {
         this.userId = userId;
     }
-
-
 }

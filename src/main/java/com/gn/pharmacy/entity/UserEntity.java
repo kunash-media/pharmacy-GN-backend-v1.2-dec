@@ -24,7 +24,6 @@ public class UserEntity {
     private String addressCity;
     private String addressPincode;
     private String addressState;
-    private String addressCountry;
     private String addressType;
 
 
@@ -49,7 +48,7 @@ public class UserEntity {
     public UserEntity(Long userId, String firstName, String lastName, String email, String phone,
                       String password, String addressLandmark, String addressArea,
                       String addressCity, String addressPincode, String addressState,
-                      String addressCountry, String addressType,
+                      String addressType,
                       List<ShippingAddressEntity> shippingAddresses, List<OrderEntity> orders,
                       List<PrescriptionEntity> prescriptions) {
         this.userId = userId;
@@ -63,7 +62,6 @@ public class UserEntity {
         this.addressCity = addressCity;
         this.addressPincode = addressPincode;
         this.addressState = addressState;
-        this.addressCountry = addressCountry;
         this.addressType = addressType;
         this.shippingAddresses = shippingAddresses;
         this.orders = orders;
@@ -159,14 +157,6 @@ public class UserEntity {
 
     public void setAddressState(String addressState) {
         this.addressState = addressState;
-    }
-
-    public String getAddressCountry() {
-        return addressCountry;
-    }
-
-    public void setAddressCountry(String addressCountry) {
-        this.addressCountry = addressCountry;
     }
 
     public String getAddressType() {

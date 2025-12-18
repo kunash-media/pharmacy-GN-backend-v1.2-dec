@@ -13,7 +13,6 @@ public class UserRequestDto {
     private String addressCity;
     private String addressPincode;
     private String addressState;
-    private String addressCountry;
     private String addressType;
 
 
@@ -97,14 +96,6 @@ public class UserRequestDto {
 
     public void setAddressState(String addressState) {
         this.addressState = addressState;
-    }
-
-    public String getAddressCountry() {
-        return addressCountry;
-    }
-
-    public void setAddressCountry(String addressCountry) {
-        this.addressCountry = addressCountry;
     }
 
     public String getAddressType() {
