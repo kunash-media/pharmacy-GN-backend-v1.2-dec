@@ -7,19 +7,21 @@ public class AdminResponseDto {
     private String lastName;
     private String phoneNumber;
     private String email;
-    private String password;
+//    private String password;
+
+    private String role;  // Added role in response
 
     // Default constructor
     public AdminResponseDto() {}
 
     // Parameterized constructor
-    public AdminResponseDto(Long id, String firstName, String lastName, String phoneNumber, String email, String password) {
+    public AdminResponseDto(Long id, String firstName, String lastName, String phoneNumber, String email) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
         this.phoneNumber = phoneNumber;
         this.email = email;
-        this.password = password;
+
     }
 
     // Getters and Setters
@@ -29,6 +31,14 @@ public class AdminResponseDto {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getFirstName() {
@@ -61,14 +71,6 @@ public class AdminResponseDto {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
 }

@@ -22,6 +22,9 @@ public class AdminEntity {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    @Column(name = "admin_role")
+    private String role;
+
     @Column(name = "email", unique = true)
     private String email;
 
@@ -32,10 +35,11 @@ public class AdminEntity {
     public AdminEntity() {}
 
     // Parameterized constructor
-    public AdminEntity(String firstName, String lastName, String phoneNumber, String email, String password) {
+    public AdminEntity(String firstName, String lastName, String phoneNumber, String role, String email, String password) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.phoneNumber = phoneNumber;
+        this.role = role;
         this.email = email;
         this.password = password;
     }
@@ -71,6 +75,15 @@ public class AdminEntity {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getEmail() {

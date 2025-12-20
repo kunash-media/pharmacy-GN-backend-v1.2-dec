@@ -3,7 +3,6 @@ package com.gn.pharmacy.controller;
 import com.gn.pharmacy.dto.request.AdminRequestDto;
 import com.gn.pharmacy.dto.response.AdminResponseDto;
 import com.gn.pharmacy.service.AdminService;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,16 +14,14 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admins")
-@Slf4j
 public class AdminController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
 
     private final AdminService adminService;
 
-    private final Logger logger = LoggerFactory.getLogger(AdminController.class);
-
     @Autowired
-    public AdminController(AdminService adminService){
+    public AdminController(AdminService adminService) {
         this.adminService = adminService;
     }
 
@@ -32,7 +29,7 @@ public class AdminController {
     public ResponseEntity<AdminResponseDto> createAdmin(@RequestBody AdminRequestDto adminRequestDto) {
         logger.info("Request received to create admin with email: {}", adminRequestDto.getEmail());
         AdminResponseDto responseDto = adminService.createAdmin(adminRequestDto);
-        logger.info("Admin created successfully with ID: {}", responseDto.getId());
+        logger.info("Admin created successfully with ID: {} and role: ROLE_ADMIN", responseDto.getId());
         return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
     }
 
@@ -89,8 +86,6 @@ public class AdminController {
         logger.info("Request received to delete admin with ID: {}", id);
         adminService.deleteAdmin(id);
         logger.info("Admin deleted successfully with ID: {}", id);
-        return ResponseEntity.status(HttpStatus.OK).body("Admin Deleted!! with ID :" + id);
+        return ResponseEntity.status(HttpStatus.OK).body("Admin Deleted!! with ID: " + id);
     }
-
 }
-

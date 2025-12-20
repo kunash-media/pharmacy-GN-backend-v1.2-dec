@@ -1,13 +1,11 @@
 package com.gn.pharmacy.service.serviceImpl;
 
-
 import com.gn.pharmacy.bcrypt.BcryptEncoderConfig;
 import com.gn.pharmacy.dto.request.AdminRequestDto;
 import com.gn.pharmacy.dto.response.AdminResponseDto;
 import com.gn.pharmacy.entity.AdminEntity;
 import com.gn.pharmacy.repository.AdminRepository;
 import com.gn.pharmacy.service.AdminService;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,28 +14,27 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
-
-@Slf4j
 @Service
 public class AdminServiceImpl implements AdminService {
 
-    private final Logger logger = LoggerFactory.getLogger(AdminServiceImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(AdminServiceImpl.class);
 
     private final AdminRepository adminRepository;
     private final BcryptEncoderConfig bcryptEncoderConfig;
 
     @Autowired
-    public AdminServiceImpl(AdminRepository adminRepository, BcryptEncoderConfig bcryptEncoderConfig){
+    public AdminServiceImpl(AdminRepository adminRepository, BcryptEncoderConfig bcryptEncoderConfig) {
         this.adminRepository = adminRepository;
-        this.bcryptEncoderConfig= bcryptEncoderConfig;
+        this.bcryptEncoderConfig = bcryptEncoderConfig;
     }
 
     @Override
     public AdminResponseDto createAdmin(AdminRequestDto adminRequestDto) {
         logger.debug("Creating new admin with email: {}", adminRequestDto.getEmail());
         AdminEntity adminEntity = convertToEntity(adminRequestDto);
+        adminEntity.setRole("ROLE_ADMIN"); // Default role
         AdminEntity savedAdmin = adminRepository.save(adminEntity);
-        logger.debug("Admin saved with ID: {}", savedAdmin.getId());
+        logger.debug("Admin saved with ID: {} and role: ROLE_ADMIN", savedAdmin.getId());
         return convertToResponseDto(savedAdmin);
     }
 
@@ -84,7 +81,6 @@ public class AdminServiceImpl implements AdminService {
                 .collect(Collectors.toList());
     }
 
-
     @Override
     public AdminResponseDto updateAdmin(Long id, AdminRequestDto adminRequestDto) {
         logger.debug("Updating admin with ID: {}", id);
@@ -93,14 +89,13 @@ public class AdminServiceImpl implements AdminService {
                     logger.error("Admin not found with id: {}", id);
                     return new RuntimeException("Admin not found with id: " + id);
                 });
-
-        // Update all fields
         existingAdmin.setFirstName(adminRequestDto.getFirstName());
         existingAdmin.setLastName(adminRequestDto.getLastName());
         existingAdmin.setPhoneNumber(adminRequestDto.getPhoneNumber());
         existingAdmin.setEmail(adminRequestDto.getEmail());
-        existingAdmin.setPassword(adminRequestDto.getPassword());
-
+        if (adminRequestDto.getPassword() != null && !adminRequestDto.getPassword().isEmpty()) {
+            existingAdmin.setPassword(bcryptEncoderConfig.encode(adminRequestDto.getPassword()));
+        }
         AdminEntity updatedAdmin = adminRepository.save(existingAdmin);
         logger.debug("Admin updated successfully with ID: {}", id);
         return convertToResponseDto(updatedAdmin);
@@ -108,25 +103,19 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public boolean changePassword(Long id, String oldPassword, String newPassword) {
-        log.debug("Changing password for admin ID: {}", id);
-
+        logger.debug("Changing password for admin ID: {}", id);
         AdminEntity adminEntity = adminRepository.findById(id)
                 .orElseThrow(() -> {
-                    log.error("Admin not found with ID: {}", id);
+                    logger.error("Admin not found with ID: {}", id);
                     return new RuntimeException("Admin not found with ID: " + id);
                 });
-
-        // Verify old password
         if (!bcryptEncoderConfig.matches(oldPassword, adminEntity.getPassword())) {
-            log.debug("Old password verification failed for admin ID: {}", id);
+            logger.debug("Old password verification failed for admin ID: {}", id);
             return false;
         }
-
-        // Set new password
         adminEntity.setPassword(bcryptEncoderConfig.encode(newPassword));
         adminRepository.save(adminEntity);
-
-        log.debug("Password updated successfully for admin ID: {}", id);
+        logger.debug("Password updated successfully for admin ID: {}", id);
         return true;
     }
 
@@ -138,24 +127,13 @@ public class AdminServiceImpl implements AdminService {
                     logger.error("Admin not found with id: {}", id);
                     return new RuntimeException("Admin not found with id: " + id);
                 });
-
-        // Update only non-null fields
-        if (adminRequestDto.getFirstName() != null) {
-            existingAdmin.setFirstName(adminRequestDto.getFirstName());
+        if (adminRequestDto.getFirstName() != null) existingAdmin.setFirstName(adminRequestDto.getFirstName());
+        if (adminRequestDto.getLastName() != null) existingAdmin.setLastName(adminRequestDto.getLastName());
+        if (adminRequestDto.getPhoneNumber() != null) existingAdmin.setPhoneNumber(adminRequestDto.getPhoneNumber());
+        if (adminRequestDto.getEmail() != null) existingAdmin.setEmail(adminRequestDto.getEmail());
+        if (adminRequestDto.getPassword() != null && !adminRequestDto.getPassword().isEmpty()) {
+            existingAdmin.setPassword(bcryptEncoderConfig.encode(adminRequestDto.getPassword()));
         }
-        if (adminRequestDto.getLastName() != null) {
-            existingAdmin.setLastName(adminRequestDto.getLastName());
-        }
-        if (adminRequestDto.getPhoneNumber() != null) {
-            existingAdmin.setPhoneNumber(adminRequestDto.getPhoneNumber());
-        }
-        if (adminRequestDto.getEmail() != null) {
-            existingAdmin.setEmail(adminRequestDto.getEmail());
-        }
-        if (adminRequestDto.getPassword() != null) {
-            existingAdmin.setPassword(adminRequestDto.getPassword());
-        }
-
         AdminEntity updatedAdmin = adminRepository.save(existingAdmin);
         logger.debug("Admin patched successfully with ID: {}", id);
         return convertToResponseDto(updatedAdmin);
@@ -184,22 +162,18 @@ public class AdminServiceImpl implements AdminService {
         return adminRepository.existsByPhoneNumber(phoneNumber);
     }
 
-    // Helper method to convert RequestDto to Entity
     private AdminEntity convertToEntity(AdminRequestDto requestDto) {
         AdminEntity entity = new AdminEntity();
         entity.setFirstName(requestDto.getFirstName());
         entity.setLastName(requestDto.getLastName());
         entity.setPhoneNumber(requestDto.getPhoneNumber());
         entity.setEmail(requestDto.getEmail());
-
         if (requestDto.getPassword() != null && !requestDto.getPassword().isEmpty()) {
             entity.setPassword(bcryptEncoderConfig.encode(requestDto.getPassword()));
         }
-
         return entity;
     }
 
-    // Helper method to convert Entity to ResponseDto
     private AdminResponseDto convertToResponseDto(AdminEntity entity) {
         AdminResponseDto responseDto = new AdminResponseDto();
         responseDto.setId(entity.getId());
@@ -207,8 +181,8 @@ public class AdminServiceImpl implements AdminService {
         responseDto.setLastName(entity.getLastName());
         responseDto.setPhoneNumber(entity.getPhoneNumber());
         responseDto.setEmail(entity.getEmail());
-        responseDto.setPassword(entity.getPassword());
+//        responseDto.setPassword(entity.getPassword());
+        responseDto.setRole(entity.getRole());
         return responseDto;
     }
 }
-
