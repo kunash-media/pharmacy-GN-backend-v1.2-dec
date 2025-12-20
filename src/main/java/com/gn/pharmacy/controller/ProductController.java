@@ -10,6 +10,8 @@ import com.gn.pharmacy.service.ProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -89,23 +91,42 @@ public class ProductController {
         }
     }
 
-    @GetMapping("/get-all-products")
-    public ResponseEntity<Page<ProductResponseDto>> getAllProducts(
+//    @GetMapping("/get-all-products")
+//    public ResponseEntity<Page<ProductResponseDto>> getAllProducts(
+//            @RequestParam(defaultValue = "0") int page,
+//            @RequestParam(defaultValue = "10") int size) {
+//
+//        logger.info("Fetching all products - page: {}, size: {}", page, size);
+//
+//        try {
+//            Page<ProductResponseDto> productPage = productService.getAllProducts(page, size);
+//            logger.info("Retrieved {} products out of {} total",
+//                    productPage.getNumberOfElements(), productPage.getTotalElements());
+//
+//            return ResponseEntity.ok(productPage);
+//
+//        } catch (Exception e) {
+//            logger.error("Error retrieving products: {}", e.getMessage(), e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
+
+
+    @GetMapping("/get-all-product")
+    public ResponseEntity<List<ProductResponseDto>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        logger.info("Fetching all products - page: {}, size: {}", page, size);
-
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "100") long delayMillis) {
         try {
-            Page<ProductResponseDto> productPage = productService.getAllProducts(page, size);
-            logger.info("Retrieved {} products out of {} total",
-                    productPage.getNumberOfElements(), productPage.getTotalElements());
+            // Add delay to simulate controlled response rate
+            Thread.sleep(delayMillis);
 
-            return ResponseEntity.ok(productPage);
+            Pageable pageable = PageRequest.of(page, size);
+            Page<ProductResponseDto> productPage = productService.getAllProducts(pageable);
 
+            return new ResponseEntity<>(productPage.getContent(), HttpStatus.OK);
         } catch (Exception e) {
-            logger.error("Error retrieving products: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

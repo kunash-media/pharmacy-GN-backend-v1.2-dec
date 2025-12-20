@@ -4,6 +4,7 @@ import com.gn.pharmacy.dto.request.ProductRequestDto;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -31,4 +32,10 @@ public interface ProductService {
     List<ProductResponseDto> getProductsByCategoryPath(List<String> path);
 
     List<ProductResponseDto> getProductsBySubPath(String subPath);
+
+    //============= NEW METHOD ADDED=========//
+    public Page<ProductResponseDto> getAllProducts(Pageable pageable);
+
+    public List<ProductResponseDto> getAllProducts();
+
 }

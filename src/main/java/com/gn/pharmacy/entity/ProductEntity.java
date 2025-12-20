@@ -1,6 +1,9 @@
 package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLDelete;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -9,6 +12,7 @@ import java.util.Map;
 
 @Entity
 @Table(name = "products")
+@SQLDelete(sql = "UPDATE products SET is_deleted = true WHERE product_id = ?")
 public class ProductEntity {
 
     @Id
@@ -39,7 +43,7 @@ public class ProductEntity {
     @Column(name = "product_status")
     private String productStatus;
 
-    @Column(name = "product_description", length = 2000)
+    @Column(name = "product_description")
     private String productDescription;
 
     private LocalDateTime createdAt;
@@ -98,7 +102,7 @@ public class ProductEntity {
     @ElementCollection
     @CollectionTable(name = "product_dynamic_fields", joinColumns = @JoinColumn(name = "product_id"))
     @MapKeyColumn(name = "field_key")
-    @Column(name = "field_value", length = 500)
+    @Column(name = "field_value")
     private Map<String, String> productDynamicFields;
 
     @ElementCollection
@@ -106,16 +110,41 @@ public class ProductEntity {
     @Column(name = "size")
     private List<String> productSizes = new ArrayList<>();
 
+    //NEW DELETED PRODUCT FIELD
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    private boolean isDeleted = false;
+
+    //NEW DELETED PRODUCT
+    public static Specification<ProductEntity> notDeleted() {
+        return (root, query, cb) -> cb.equal(root.get("isDeleted"), false);
+    }
+
+
+    //==================  inventory relationship added ===============//
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<InventoryEntity> inventoryBatches = new ArrayList<>();
+
+    // Helper method to get total quantity from all batches
+    public Integer getTotalCalculatedStock() {
+        return inventoryBatches.stream()
+                .mapToInt(InventoryEntity::getQuantity)
+                .sum();
+    }
+
     // Constructors
     public ProductEntity() {}
 
-    public ProductEntity(String sku, String productName, String productCategory, String productSubCategory,
-                         BigDecimal productPrice, BigDecimal productOldPrice, String productStock,
-                         String productStatus, String productDescription, Integer productQuantity,
+
+    public ProductEntity(Long productId, String sku, String productName, String productCategory,
+                         String productSubCategory, BigDecimal productPrice,
+                         BigDecimal productOldPrice, String productStock, String productStatus,
+                         String productDescription, LocalDateTime createdAt, Integer productQuantity,
                          boolean prescriptionRequired, String brandName, String mfgDate, String expDate,
-                         String batchNo, Double rating, List<String> benefitsList, List<String> ingredientsList,
-                         List<String> directionsList, List<String> categoryPath, Map<String, String> productDynamicFields,
-                         List<String> productSizes) {
+                         String batchNo, Double rating, List<String> categoryPath, List<String> benefitsList,
+                         List<String> ingredientsList, List<String> directionsList, byte[] productMainImage,
+                         List<byte[]> productSubImages, Map<String, String> productDynamicFields,
+                         List<String> productSizes, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
+        this.productId = productId;
         this.sku = sku;
         this.productName = productName;
         this.productCategory = productCategory;
@@ -125,6 +154,7 @@ public class ProductEntity {
         this.productStock = productStock;
         this.productStatus = productStatus;
         this.productDescription = productDescription;
+        this.createdAt = createdAt;
         this.productQuantity = productQuantity;
         this.prescriptionRequired = prescriptionRequired;
         this.brandName = brandName;
@@ -132,14 +162,18 @@ public class ProductEntity {
         this.expDate = expDate;
         this.batchNo = batchNo;
         this.rating = rating;
+        this.categoryPath = categoryPath;
         this.benefitsList = benefitsList;
         this.ingredientsList = ingredientsList;
         this.directionsList = directionsList;
-        this.categoryPath = categoryPath;
+        this.productMainImage = productMainImage;
+        this.productSubImages = productSubImages;
         this.productDynamicFields = productDynamicFields;
         this.productSizes = productSizes;
-        this.createdAt = LocalDateTime.now();
+        this.isDeleted = isDeleted;
+        this.inventoryBatches = inventoryBatches;
     }
+
 
     // Getters and Setters (all fields)
     public Long getProductId() { return productId; }
@@ -219,4 +253,21 @@ public class ProductEntity {
 
     public List<String> getProductSizes() { return productSizes; }
     public void setProductSizes(List<String> productSizes) { this.productSizes = productSizes; }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+
+    public List<InventoryEntity> getInventoryBatches() {
+        return inventoryBatches;
+    }
+
+    public void setInventoryBatches(List<InventoryEntity> inventoryBatches) {
+        this.inventoryBatches = inventoryBatches;
+    }
 }

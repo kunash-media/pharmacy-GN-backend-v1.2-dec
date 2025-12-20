@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -144,6 +145,34 @@ public class ProductServiceImpl implements ProductService {
         logger.debug("Found {} products on page {}", productPage.getNumberOfElements(), page);
         return productPage.map(this::mapToResponseDto);
     }
+
+    //==============  NEW GET ALL NON-DELETED INCLUDED ONLY =================//
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
+        try {
+            Page<ProductEntity> entities = productRepository.findAllActive(pageable);
+            return entities.map(this::mapToResponseDto);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductResponseDto> getAllProducts() {
+        try {
+            List<ProductEntity> entities = productRepository.findAllActive();
+            // Use stream to map each entity using mapToResponseDto
+            return entities.stream()
+                    .map(this::mapToResponseDto)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
+        }
+    }
+
+    //========================== END =========================================//
 
     @Override
     public List<ProductResponseDto> getProductsByCategory(String category) {
