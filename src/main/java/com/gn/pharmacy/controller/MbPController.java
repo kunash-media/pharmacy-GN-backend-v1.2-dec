@@ -3,12 +3,16 @@ package com.gn.pharmacy.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gn.pharmacy.dto.request.MbPRequestDto;
 import com.gn.pharmacy.dto.response.MbPResponseDto;
+import com.gn.pharmacy.dto.response.ProductResponseDto;
 import com.gn.pharmacy.entity.MbPEntity;
 import com.gn.pharmacy.repository.MbPRepository;
 import com.gn.pharmacy.service.MbPService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -155,6 +159,24 @@ public class MbPController {
         }
     }
 
+    @GetMapping("/get-all-product")
+    public ResponseEntity<List<MbPResponseDto>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "100") long delayMillis) {
+        try {
+            // Add delay to simulate controlled response rate
+            Thread.sleep(delayMillis);
+
+            Pageable pageable = PageRequest.of(page, size);
+            Page<MbPResponseDto> productPage = mbpService.getAllProducts(pageable);
+
+            return new ResponseEntity<>(productPage.getContent(), HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MbPResponseDto> updateMbProduct(
             @PathVariable Long id,
@@ -227,7 +249,7 @@ public class MbPController {
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/delete-by-id/{id}")
     public ResponseEntity<Void> deleteMbProduct(@PathVariable Long id) {
         logger.info("Deleting MB product with ID: {}", id);
 

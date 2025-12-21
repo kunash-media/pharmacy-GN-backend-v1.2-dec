@@ -1,12 +1,16 @@
 package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLDelete;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 @Entity
 @Table(name = "mb_products")
+@SQLDelete(sql = "UPDATE mb_products SET is_deleted = true WHERE id = ?")
 public class MbPEntity {
 
     @Id
@@ -58,6 +62,7 @@ public class MbPEntity {
 
     private String specifications;
 
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt;
@@ -65,6 +70,15 @@ public class MbPEntity {
     @PrePersist
     protected void onCreate() {
         createdAt = new Date();
+    }
+
+
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    private boolean isDeleted = false;
+
+    //NEW DELETED PRODUCT
+    public static Specification<MbPEntity> notDeleted() {
+        return (root, query, cb) -> cb.equal(root.get("isDeleted"), false);
     }
 
     // Getters & Setters
@@ -127,4 +141,12 @@ public class MbPEntity {
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
 }

@@ -2,13 +2,18 @@ package com.gn.pharmacy.service.serviceImpl;
 
 import com.gn.pharmacy.dto.request.MbPRequestDto;
 import com.gn.pharmacy.dto.response.MbPResponseDto;
+import com.gn.pharmacy.dto.response.ProductResponseDto;
 import com.gn.pharmacy.entity.MbPEntity;
+import com.gn.pharmacy.entity.ProductEntity;
 import com.gn.pharmacy.repository.MbPRepository;
 import com.gn.pharmacy.service.MbPService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.HashSet;
@@ -170,6 +175,36 @@ public class MbPServiceImpl implements MbPService {
             throw e;
         }
     }
+
+    //============= NEW DELETD GET ALL HANDLED ====================//
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MbPResponseDto> getAllProducts(Pageable pageable) {
+        try {
+            Page<MbPEntity> entities = repo.findAllActive(pageable);
+            return entities.map(this::toDto);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MbPResponseDto> getAllProducts() {
+        try {
+            List<MbPEntity> entities = repo.findAllActive();
+            // Use stream to map each entity using mapToResponseDto
+            return entities.stream()
+                    .map(this::toDto)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
+        }
+    }
+
+    //========================== END =========================================//
+
 
     @Override
     public List<MbPResponseDto> getMbProductsByCategory(String category) {
