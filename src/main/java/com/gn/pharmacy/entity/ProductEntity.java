@@ -110,6 +110,9 @@ public class ProductEntity {
     @Column(name = "size")
     private List<String> productSizes = new ArrayList<>();
 
+    @Column(name = "is_approved", nullable = false, columnDefinition = "boolean default false")
+    private boolean isApproved = false;
+
     //NEW DELETED PRODUCT FIELD
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private boolean isDeleted = false;
@@ -143,7 +146,7 @@ public class ProductEntity {
                          String batchNo, Double rating, List<String> categoryPath, List<String> benefitsList,
                          List<String> ingredientsList, List<String> directionsList, byte[] productMainImage,
                          List<byte[]> productSubImages, Map<String, String> productDynamicFields,
-                         List<String> productSizes, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
+                         List<String> productSizes, boolean isApproved, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
         this.productId = productId;
         this.sku = sku;
         this.productName = productName;
@@ -170,6 +173,7 @@ public class ProductEntity {
         this.productSubImages = productSubImages;
         this.productDynamicFields = productDynamicFields;
         this.productSizes = productSizes;
+        this.isApproved = isApproved;
         this.isDeleted = isDeleted;
         this.inventoryBatches = inventoryBatches;
     }
@@ -269,5 +273,13 @@ public class ProductEntity {
 
     public void setInventoryBatches(List<InventoryEntity> inventoryBatches) {
         this.inventoryBatches = inventoryBatches;
+    }
+
+    public boolean isApproved() {
+        return isApproved;
+    }
+
+    public void setApproved(boolean approved) {
+        isApproved = approved;
     }
 }

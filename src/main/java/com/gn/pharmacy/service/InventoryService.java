@@ -1,7 +1,9 @@
 package com.gn.pharmacy.service;
 
 import com.gn.pharmacy.dto.response.BatchInfoDTO;
+import com.gn.pharmacy.dto.response.BatchWithProductDTO;
 import com.gn.pharmacy.dto.response.ProductAdminResponseDTO;
+import org.springframework.data.domain.Page;
 
 public interface InventoryService {
     // Add a new batch to an existing medicine
@@ -12,4 +14,13 @@ public interface InventoryService {
 
     // Update quantity of a specific batch
     void updateBatchQuantity(String batchNo, Integer newQuantity);
+
+    // New methods
+//    Page<BatchInfoDTO> getAllBatches(int page, int size, Long productId);
+    void updateBatch(Long inventoryId, BatchInfoDTO batchUpdate);
+    void deleteBatch(Long inventoryId);
+
+
+    Page<BatchWithProductDTO> getAllBatches(int page, int size, Long productId);
+
 }

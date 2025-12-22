@@ -91,28 +91,29 @@ public class ProductController {
         }
     }
 
-//    @GetMapping("/get-all-products")
-//    public ResponseEntity<Page<ProductResponseDto>> getAllProducts(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size) {
-//
-//        logger.info("Fetching all products - page: {}, size: {}", page, size);
-//
-//        try {
-//            Page<ProductResponseDto> productPage = productService.getAllProducts(page, size);
-//            logger.info("Retrieved {} products out of {} total",
-//                    productPage.getNumberOfElements(), productPage.getTotalElements());
-//
-//            return ResponseEntity.ok(productPage);
-//
-//        } catch (Exception e) {
-//            logger.error("Error retrieving products: {}", e.getMessage(), e);
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-//        }
-//    }
+    //GET ALL PRODUCTS WITH DELETED
+    @GetMapping("/get-all-products")
+    public ResponseEntity<Page<ProductResponseDto>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
 
+        logger.info("Fetching all products - page: {}, size: {}", page, size);
 
-    @GetMapping("/get-all-product")
+        try {
+            Page<ProductResponseDto> productPage = productService.getAllProducts(page, size);
+            logger.info("Retrieved {} products out of {} total",
+                    productPage.getNumberOfElements(), productPage.getTotalElements());
+
+            return ResponseEntity.ok(productPage);
+
+        } catch (Exception e) {
+            logger.error("Error retrieving products: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    //GET ALL PRODUCTS WITHOUT DELETED
+    @GetMapping("/get-all-active-products")
     public ResponseEntity<List<ProductResponseDto>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,

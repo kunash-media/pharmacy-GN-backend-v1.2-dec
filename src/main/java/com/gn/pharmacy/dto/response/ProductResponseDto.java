@@ -34,6 +34,9 @@ public class ProductResponseDto {
     private Map<String, String> productDynamicFields;
     private List<String> productSizes = new ArrayList<>();
 
+    private boolean isApproved;
+    private boolean isDeleted;
+
     // Getters and Setters
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
@@ -112,4 +115,20 @@ public class ProductResponseDto {
 
     public List<String> getProductSizes() { return productSizes; }
     public void setProductSizes(List<String> productSizes) { this.productSizes = productSizes; }
+
+    public boolean isApproved() {
+        return isApproved;
+    }
+
+    public void setApproved(boolean approved) {
+        isApproved = approved;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
 }

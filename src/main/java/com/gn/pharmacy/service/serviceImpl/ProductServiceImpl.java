@@ -284,6 +284,7 @@ public class ProductServiceImpl implements ProductService {
                     return new IllegalArgumentException("Product not found with ID: " + id);
                 });
 
+
         // Patch only non-null fields
         if (requestDto.getSku() != null) entity.setSku(requestDto.getSku());
         if (requestDto.getProductName() != null) entity.setProductName(requestDto.getProductName());
@@ -712,6 +713,8 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponseDto mapToResponseDto(ProductEntity entity) {
         ProductResponseDto responseDto = new ProductResponseDto();
 
+        responseDto.setApproved(entity.isApproved());
+        responseDto.setDeleted(entity.isDeleted());
         responseDto.setProductId(entity.getProductId());
         responseDto.setSku(entity.getSku());
         responseDto.setProductName(entity.getProductName());
