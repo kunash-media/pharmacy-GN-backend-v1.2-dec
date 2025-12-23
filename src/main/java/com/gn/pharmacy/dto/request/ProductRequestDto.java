@@ -11,8 +11,10 @@ public class ProductRequestDto {
     private String productName;
     private String productCategory;
     private String productSubCategory;
-    private BigDecimal productPrice;
-    private BigDecimal productOldPrice;
+
+    private List<BigDecimal> productPrice;
+    private List<BigDecimal> productOldPrice;
+
     private String productStock;
     private String productStatus;
     private String productDescription;
@@ -45,11 +47,22 @@ public class ProductRequestDto {
     public String getProductSubCategory() { return productSubCategory; }
     public void setProductSubCategory(String productSubCategory) { this.productSubCategory = productSubCategory; }
 
-    public BigDecimal getProductPrice() { return productPrice; }
-    public void setProductPrice(BigDecimal productPrice) { this.productPrice = productPrice; }
 
-    public BigDecimal getProductOldPrice() { return productOldPrice; }
-    public void setProductOldPrice(BigDecimal productOldPrice) { this.productOldPrice = productOldPrice; }
+    public List<BigDecimal> getProductPrice() {
+        return productPrice;
+    }
+
+    public void setProductPrice(List<BigDecimal> productPrice) {
+        this.productPrice = productPrice;
+    }
+
+    public List<BigDecimal> getProductOldPrice() {
+        return productOldPrice;
+    }
+
+    public void setProductOldPrice(List<BigDecimal> productOldPrice) {
+        this.productOldPrice = productOldPrice;
+    }
 
     public String getProductStock() { return productStock; }
     public void setProductStock(String productStock) { this.productStock = productStock; }

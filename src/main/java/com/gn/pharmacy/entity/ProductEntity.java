@@ -31,11 +31,21 @@ public class ProductEntity {
     @Column(name = "product_sub_category")
     private String productSubCategory;
 
-    @Column(name = "product_price")
-    private BigDecimal productPrice;
 
+    @ElementCollection
+    @CollectionTable(name = "products_prices", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "product_price")
+    private List<BigDecimal> productPrice = new ArrayList<>();
+
+    @ElementCollection
+    @CollectionTable(name = "products_original_prices", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "product_old_price")
-    private BigDecimal productOldPrice;
+    private List<BigDecimal> productOldPrice = new ArrayList<>();
+
+//    @Column(name = "product_price")
+//    private BigDecimal productPrice;
+//    @Column(name = "product_old_price")
+//    private BigDecimal productOldPrice;
 
     @Column(name = "product_stock")
     private String productStock;
@@ -139,14 +149,14 @@ public class ProductEntity {
 
 
     public ProductEntity(Long productId, String sku, String productName, String productCategory,
-                         String productSubCategory, BigDecimal productPrice,
-                         BigDecimal productOldPrice, String productStock, String productStatus,
+                         String productSubCategory, List<BigDecimal> productPrice,
+                         List<BigDecimal> productOldPrice, String productStock, String productStatus,
                          String productDescription, LocalDateTime createdAt, Integer productQuantity,
                          boolean prescriptionRequired, String brandName, String mfgDate, String expDate,
                          String batchNo, Double rating, List<String> categoryPath, List<String> benefitsList,
                          List<String> ingredientsList, List<String> directionsList, byte[] productMainImage,
-                         List<byte[]> productSubImages, Map<String, String> productDynamicFields,
-                         List<String> productSizes, boolean isApproved, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
+                         List<byte[]> productSubImages, Map<String, String> productDynamicFields, List<String> productSizes,
+                         boolean isApproved, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
         this.productId = productId;
         this.sku = sku;
         this.productName = productName;
@@ -178,7 +188,6 @@ public class ProductEntity {
         this.inventoryBatches = inventoryBatches;
     }
 
-
     // Getters and Setters (all fields)
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
@@ -195,11 +204,6 @@ public class ProductEntity {
     public String getProductSubCategory() { return productSubCategory; }
     public void setProductSubCategory(String productSubCategory) { this.productSubCategory = productSubCategory; }
 
-    public BigDecimal getProductPrice() { return productPrice; }
-    public void setProductPrice(BigDecimal productPrice) { this.productPrice = productPrice; }
-
-    public BigDecimal getProductOldPrice() { return productOldPrice; }
-    public void setProductOldPrice(BigDecimal productOldPrice) { this.productOldPrice = productOldPrice; }
 
     public String getProductStock() { return productStock; }
     public void setProductStock(String productStock) { this.productStock = productStock; }
@@ -281,5 +285,22 @@ public class ProductEntity {
 
     public void setApproved(boolean approved) {
         isApproved = approved;
+    }
+
+
+    public List<BigDecimal> getProductPrice() {
+        return productPrice;
+    }
+
+    public void setProductPrice(List<BigDecimal> productPrice) {
+        this.productPrice = productPrice;
+    }
+
+    public List<BigDecimal> getProductOldPrice() {
+        return productOldPrice;
+    }
+
+    public void setProductOldPrice(List<BigDecimal> productOldPrice) {
+        this.productOldPrice = productOldPrice;
     }
 }

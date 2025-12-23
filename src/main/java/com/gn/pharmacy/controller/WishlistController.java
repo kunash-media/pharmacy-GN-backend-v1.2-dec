@@ -147,8 +147,8 @@ public class WishlistController {
                 if (product != null) {
                     map.put("productId", product.getProductId());
                     map.put("title", product.getProductName());
-                    map.put("price", product.getProductPrice());
-                    map.put("originalPrice", product.getProductPrice()); // Change if you have separate MRP
+                    map.put("price", product.getProductOldPrice());
+                    map.put("originalPrice", product.getProductOldPrice()); // Change if you have separate MRP
                     map.put("imageUrl", "/api/products/" + product.getProductId() + "/image");
                     map.put("subImageUrls", getSubImageUrls(product.getProductId(),
                             product.getProductSubImages() != null ? product.getProductSubImages().size() : 0));

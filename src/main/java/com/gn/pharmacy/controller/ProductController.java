@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -446,17 +447,40 @@ public class ProductController {
         if (requestDto.getProductName() == null || requestDto.getProductName().trim().isEmpty()) {
             throw new IllegalArgumentException("Product name is required");
         }
-        if (requestDto.getProductPrice() == null) {
-            throw new IllegalArgumentException("Product price is required");
+
+        if (requestDto.getProductPrice() == null || requestDto.getProductPrice().isEmpty()) {
+            throw new IllegalArgumentException("At least one product price is required");
         }
-        if (requestDto.getProductQuantity() == null) {
-            throw new IllegalArgumentException("Product quantity is required");
+
+        // Optional: validate that prices are positive
+        if (requestDto.getProductPrice().stream().anyMatch(price -> price == null || price.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new IllegalArgumentException("All product prices must be greater than zero");
         }
+
+        if (requestDto.getProductQuantity() == null || requestDto.getProductQuantity() < 0) {
+            throw new IllegalArgumentException("Valid product quantity is required");
+        }
+
+        // Keep main image required for now (or make optional later)
         if (requestDto.getProductMainImage() == null || requestDto.getProductMainImage().isEmpty()) {
             throw new IllegalArgumentException("Product main image is required");
         }
-    }
 
+        // Optional: if old prices provided, ensure same size as prices
+        if (requestDto.getProductOldPrice() != null && !requestDto.getProductOldPrice().isEmpty()) {
+            if (requestDto.getProductOldPrice().size() != requestDto.getProductPrice().size()) {
+                throw new IllegalArgumentException("productOldPrice list must have the same number of entries as productPrice");
+            }
+            // Optional: old price > current price?
+            for (int i = 0; i < requestDto.getProductPrice().size(); i++) {
+                BigDecimal current = requestDto.getProductPrice().get(i);
+                BigDecimal old = requestDto.getProductOldPrice().get(i);
+                if (old != null && old.compareTo(current) <= 0) {
+                    throw new IllegalArgumentException("Old price must be greater than current price for variant " + i);
+                }
+            }
+        }
+    }
     private ProductResponseDto mapToResponseDto(ProductEntity entity) {
         ProductResponseDto responseDto = new ProductResponseDto();
 
