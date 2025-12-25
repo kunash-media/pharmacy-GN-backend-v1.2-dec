@@ -42,10 +42,6 @@ public class ProductEntity {
     @Column(name = "product_old_price")
     private List<BigDecimal> productOldPrice = new ArrayList<>();
 
-//    @Column(name = "product_price")
-//    private BigDecimal productPrice;
-//    @Column(name = "product_old_price")
-//    private BigDecimal productOldPrice;
 
     @Column(name = "product_stock")
     private String productStock;

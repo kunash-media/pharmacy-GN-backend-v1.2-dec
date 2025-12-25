@@ -9,8 +9,12 @@ public class MbPRequestDto {
     private String title;
     private String category;
     private String subCategory;
-    private Double price;
-    private Double originalPrice;
+
+    private List<Double> price = new ArrayList<>();
+    private List<Double> originalPrice = new ArrayList<>();
+
+//    private Double price;
+//    private Double originalPrice;
     private Integer discount;
     private Double rating;
     private Integer reviewCount;
@@ -37,11 +41,22 @@ public class MbPRequestDto {
     public String getSubCategory() { return subCategory; }
     public void setSubCategory(String subCategory) { this.subCategory = subCategory; }
 
-    public Double getPrice() { return price; }
-    public void setPrice(Double price) { this.price = price; }
 
-    public Double getOriginalPrice() { return originalPrice; }
-    public void setOriginalPrice(Double originalPrice) { this.originalPrice = originalPrice; }
+    public List<Double> getPrice() {
+        return price;
+    }
+
+    public void setPrice(List<Double> price) {
+        this.price = price;
+    }
+
+    public List<Double> getOriginalPrice() {
+        return originalPrice;
+    }
+
+    public void setOriginalPrice(List<Double> originalPrice) {
+        this.originalPrice = originalPrice;
+    }
 
     public Integer getDiscount() { return discount; }
     public void setDiscount(Integer discount) { this.discount = discount; }

@@ -3,11 +3,8 @@ package com.gn.pharmacy.service.serviceImpl;
 import com.gn.pharmacy.dto.request.OrderItemDto;
 import com.gn.pharmacy.dto.request.OrderRequestDto;
 import com.gn.pharmacy.dto.response.OrderResponseDto;
-import com.gn.pharmacy.entity.OrderEntity;
+import com.gn.pharmacy.entity.*;
 
-import com.gn.pharmacy.entity.OrderItemEntity;
-import com.gn.pharmacy.entity.ProductEntity;
-import com.gn.pharmacy.entity.UserEntity;
 import com.gn.pharmacy.repository.OrderItemRepository;
 
 import com.gn.pharmacy.repository.OrderRepository;
@@ -25,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,33 +64,60 @@ public class OrderServiceImpl implements OrderService {
         OrderEntity savedEntity = orderRepository.save(orderEntity);
 
         // NEW FIX : Deduct product quantities
+        // Deduct from actual inventory batches (FIFO: oldest batches first)
         if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
             for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
-                if (itemDto.getProductId() != null) {
-                    ProductEntity product = productRepository.findById(itemDto.getProductId())
-                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
-
-                    Integer currentStockQuantity = product.getProductQuantity();
-                    if (currentStockQuantity < itemDto.getQuantity()) {
-                        throw new RuntimeException("Insufficient stock for product ID: " + itemDto.getProductId() +
-                                ". Available: " + currentStockQuantity + ", Required: " + itemDto.getQuantity());
-                    }
-
-                    Integer newStock = currentStockQuantity - itemDto.getQuantity();
-                    product.setProductQuantity(newStock);
-                    productRepository.save(product);
-                    logger.info("Deducted {} units from product ID: {}. New stock: {}",
-                            itemDto.getQuantity(), product.getProductId(), newStock);
+                if (itemDto.getProductId() == null || itemDto.getQuantity() <= 0) {
+                    continue;
                 }
+
+                // Fetch product with inventory batches
+                ProductEntity product = productRepository.findById(itemDto.getProductId())
+                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
+
+                // Load inventory batches (assuming lazy, but since we're in transaction, it's ok)
+                List<InventoryEntity> batches = product.getInventoryBatches();
+                if (batches == null || batches.isEmpty()) {
+                    throw new RuntimeException("No inventory available for product ID: " + itemDto.getProductId());
+                }
+
+                int required = itemDto.getQuantity();
+                int remainingToDeduct = required;
+
+                // Sort batches by oldest first (you can change criteria: mfgDate, inventoryId, etc.)
+                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId)); // FIFO by ID (or parse mfgDate if needed)
+
+                for (InventoryEntity batch : batches) {
+                    if (remainingToDeduct <= 0) break;
+
+                    if (batch.getQuantity() > 0) {
+                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
+                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
+                        remainingToDeduct -= deductFromThisBatch;
+
+                        logger.info("Deducted {} from batch {} (product ID: {}). Remaining in batch: {}",
+                                deductFromThisBatch, batch.getBatchNo(), product.getProductId(), batch.getQuantity());
+                    }
+                }
+
+                if (remainingToDeduct > 0) {
+                    throw new RuntimeException("Insufficient inventory for product ID: " + itemDto.getProductId() +
+                            ". Required: " + required + ", Available across batches: " +
+                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
+                }
+
+                // Save updated batches (cascade should handle it, but safe to save product)
+                productRepository.save(product);
             }
-            // Existing code continues...
+
+            // After deduction, proceed to create order items...
             List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
                     .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
                     .collect(Collectors.toList());
-
             orderItemRepository.saveAll(orderItems);
             savedEntity.setOrderItems(orderItems);
         }
+
         logger.info("Order created with ID: {}", savedEntity.getOrderId());
         return mapToResponseDto(savedEntity);
     }
@@ -349,22 +374,64 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Restore product quantities
-        if (orderEntity.getOrderItems() != null) {
 
+        // Restore inventory on cancellation
+        if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
             for (OrderItemEntity item : orderEntity.getOrderItems()) {
-                if (item.getProduct() != null) {
+                ProductEntity product = item.getProduct();
+                if (product == null) continue;
 
-                    ProductEntity product = item.getProduct();
-                    Integer currentStockQuantity = product.getProductQuantity();
-                    Integer restoredStock = currentStockQuantity + item.getQuantity();
-                    product.setProductQuantity(restoredStock);
+                int quantityToRestore = item.getQuantity();
+                if (quantityToRestore <= 0) continue;
 
-                    productRepository.save(product);
-                    logger.info("Restored {} units to product ID: {}. New stock: {}",
-                            item.getQuantity(), product.getProductId(), restoredStock);
+                List<InventoryEntity> batches = product.getInventoryBatches();
+                if (batches == null || batches.isEmpty()) {
+                    // Optional: create a new "returned" batch? Or just skip?
+                    // For now, create a new batch for returned stock
+                    InventoryEntity returnedBatch = new InventoryEntity();
+                    returnedBatch.setProduct(product);
+                    returnedBatch.setBatchNo("RETURNED-" + orderId + "-" + item.getOrderItemId());
+                    returnedBatch.setMfgDate("N/A");
+                    returnedBatch.setExpDate("N/A");
+                    returnedBatch.setQuantity(quantityToRestore);
+                    returnedBatch.setStockStatus("AVAILABLE");
+                    batches.add(returnedBatch);
+                    product.getInventoryBatches().add(returnedBatch);
+                    logger.info("Created returned batch for {} units of product ID: {}", quantityToRestore, product.getProductId());
+                } else {
+                    // Add back to newest batch (last in list) - or you can sort reverse
+                    batches.sort(Comparator.comparing(InventoryEntity::getInventoryId).reversed()); // newest first
+
+                    int remainingToRestore = quantityToRestore;
+                    for (InventoryEntity batch : batches) {
+                        if (remainingToRestore <= 0) break;
+                        int addToThisBatch = remainingToRestore;
+                        batch.setQuantity(batch.getQuantity() + addToThisBatch);
+                        remainingToRestore -= addToThisBatch;
+                        logger.info("Restored {} units to batch {} (product ID: {})", addToThisBatch, batch.getBatchNo(), product.getProductId());
+                    }
                 }
+
+                productRepository.save(product);
             }
         }
+
+//        if (orderEntity.getOrderItems() != null) {
+//
+//            for (OrderItemEntity item : orderEntity.getOrderItems()) {
+//                if (item.getProduct() != null) {
+//
+//                    ProductEntity product = item.getProduct();
+//                    Integer currentStockQuantity = product.getProductQuantity();
+//                    Integer restoredStock = currentStockQuantity + item.getQuantity();
+//                    product.setProductQuantity(restoredStock);
+//
+//                    productRepository.save(product);
+//                    logger.info("Restored {} units to product ID: {}. New stock: {}",
+//                            item.getQuantity(), product.getProductId(), restoredStock);
+//                }
+//            }
+//        }
 
         // Update order status to CANCELLED
         orderEntity.setOrderStatus("CANCELLED");

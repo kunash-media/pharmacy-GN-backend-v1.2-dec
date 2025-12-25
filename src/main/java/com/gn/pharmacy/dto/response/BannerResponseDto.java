@@ -5,15 +5,11 @@ import java.util.List;
 public class BannerResponseDto {
 
     private Long bannerId;
-
     private String pageName;
-
     private List<String> bannerFileSlides;
 
     private String bannerFileTwo;
-
     private String bannerFileThree;
-
     private String bannerFileFour;
 
     public Long getId() {

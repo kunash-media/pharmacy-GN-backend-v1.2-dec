@@ -26,8 +26,21 @@ public class MbPEntity {
     @Column(name = "sub_category")
     private String subCategory;
 
-    private Double price;
-    private Double originalPrice;
+//    private Double price;
+//    private Double originalPrice;
+
+    // CHANGED: Now List<Double> instead of Double
+    @ElementCollection
+    @CollectionTable(name = "mbp_prices", joinColumns = @JoinColumn(name = "mbp_id"))
+    @Column(name = "price")
+    private List<Double> price = new ArrayList<>();
+
+    @ElementCollection
+    @CollectionTable(name = "mbp_original_prices", joinColumns = @JoinColumn(name = "mbp_id"))
+    @Column(name = "original_price")
+    private List<Double> originalPrice = new ArrayList<>();
+
+
     private Integer discount;
     private Double rating;
     private Integer reviewCount;
@@ -97,11 +110,22 @@ public class MbPEntity {
     public String getSubCategory() { return subCategory; }
     public void setSubCategory(String subCategory) { this.subCategory = subCategory; }
 
-    public Double getPrice() { return price; }
-    public void setPrice(Double price) { this.price = price; }
 
-    public Double getOriginalPrice() { return originalPrice; }
-    public void setOriginalPrice(Double originalPrice) { this.originalPrice = originalPrice; }
+    public List<Double> getPrice() {
+        return price;
+    }
+
+    public void setPrice(List<Double> price) {
+        this.price = price;
+    }
+
+    public List<Double> getOriginalPrice() {
+        return originalPrice;
+    }
+
+    public void setOriginalPrice(List<Double> originalPrice) {
+        this.originalPrice = originalPrice;
+    }
 
     public Integer getDiscount() { return discount; }
     public void setDiscount(Integer discount) { this.discount = discount; }

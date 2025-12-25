@@ -97,45 +97,185 @@ public class BannerServiceImpl implements BannerService {
         return dtos;
     }
 
+//    @Override
+//    public BannerResponseDto updateBanner(Long bannerId, BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+//        logger.info("Updating banner with ID: {}", bannerId);
+//        Optional<BannerEntity> optionalEntity = bannerRepository.findById(bannerId);
+//        if (optionalEntity.isPresent()) {
+//            BannerEntity entity = optionalEntity.get();
+//
+//            if (dto.getPageName() != null) {
+//                entity.setPageName(dto.getPageName());
+//            }
+//
+//            if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
+//                List<byte[]> slidesBytes = new ArrayList<>();
+//                for (MultipartFile file : bannerFileSlides) {
+//                    if (!file.isEmpty()) {
+//                        slidesBytes.add(file.getBytes());
+//                    }
+//                }
+//                entity.setBannerFileSlides(slidesBytes);
+//            }
+//
+//            if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
+//                entity.setBannerFileTwo(bannerFileTwo.getBytes());
+//            }
+//
+//            if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
+//                entity.setBannerFileThree(bannerFileThree.getBytes());
+//            }
+//
+//            if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
+//                entity.setBannerFileFour(bannerFileFour.getBytes());
+//            }
+//
+//            BannerEntity updatedEntity = bannerRepository.save(entity);
+//            logger.info("Banner updated with ID: {}", updatedEntity.getBannerId());
+//            return convertToResponseDto(updatedEntity);
+//        } else {
+//            logger.warn("Banner not found for update with ID: {}", bannerId);
+//            throw new RuntimeException("Banner not found");
+//        }
+//    }
+
+
     @Override
-    public BannerResponseDto updateBanner(Long bannerId, BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+    public BannerResponseDto updateBanner(Long bannerId, BannerRequestDto dto,
+                                          List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo,
+                                          MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+
+        logger.info("=== BANNER SERVICE UPDATE START ===");
         logger.info("Updating banner with ID: {}", bannerId);
+        logger.info("PageName from DTO: {}", dto.getPageName());
+
+        // Log all incoming files in detail
+        logger.info("bannerFileSlides: {}",
+                bannerFileSlides != null ? bannerFileSlides.size() + " file(s)" : "null");
+
+        if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
+            for (int i = 0; i < bannerFileSlides.size(); i++) {
+                MultipartFile file = bannerFileSlides.get(i);
+                logger.info("  Slide {}: {} ({} bytes, Content-Type: {})",
+                        i + 1,
+                        file.getOriginalFilename(),
+                        file.getSize(),
+                        file.getContentType());
+            }
+        }
+
+        logger.info("bannerFileTwo: {}",
+                bannerFileTwo != null ?
+                        String.format("%s (%d bytes, Content-Type: %s)",
+                                bannerFileTwo.getOriginalFilename(),
+                                bannerFileTwo.getSize(),
+                                bannerFileTwo.getContentType()) : "null");
+
+        logger.info("bannerFileThree: {}",
+                bannerFileThree != null ?
+                        String.format("%s (%d bytes, Content-Type: %s)",
+                                bannerFileThree.getOriginalFilename(),
+                                bannerFileThree.getSize(),
+                                bannerFileThree.getContentType()) : "null");
+
+        logger.info("bannerFileFour: {}",
+                bannerFileFour != null ?
+                        String.format("%s (%d bytes, Content-Type: %s)",
+                                bannerFileFour.getOriginalFilename(),
+                                bannerFileFour.getSize(),
+                                bannerFileFour.getContentType()) : "null");
+
+        // Find the existing banner
         Optional<BannerEntity> optionalEntity = bannerRepository.findById(bannerId);
-        if (optionalEntity.isPresent()) {
-            BannerEntity entity = optionalEntity.get();
+        if (!optionalEntity.isPresent()) {
+            logger.error("Banner not found with ID: {}", bannerId);
+            throw new RuntimeException("Banner not found with ID: " + bannerId);
+        }
 
-            if (dto.getPageName() != null) {
-                entity.setPageName(dto.getPageName());
-            }
+        BannerEntity entity = optionalEntity.get();
+        logger.info("Found existing banner: ID={}, PageName={}",
+                entity.getBannerId(), entity.getPageName());
 
-            if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
-                List<byte[]> slidesBytes = new ArrayList<>();
-                for (MultipartFile file : bannerFileSlides) {
-                    if (!file.isEmpty()) {
-                        slidesBytes.add(file.getBytes());
-                    }
+        // Update page name if provided
+        if (dto.getPageName() != null) {
+            logger.info("Updating pageName from '{}' to '{}'",
+                    entity.getPageName(), dto.getPageName());
+            entity.setPageName(dto.getPageName());
+        }
+
+        // Update banner slides if provided
+        if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {
+            logger.info("Processing {} slide file(s)", bannerFileSlides.size());
+            List<byte[]> slidesBytes = new ArrayList<>();
+            for (MultipartFile file : bannerFileSlides) {
+                if (!file.isEmpty()) {
+                    byte[] fileBytes = file.getBytes();
+                    slidesBytes.add(fileBytes);
+                    logger.info("Added slide: {} ({} bytes)",
+                            file.getOriginalFilename(), fileBytes.length);
                 }
-                entity.setBannerFileSlides(slidesBytes);
             }
+            entity.setBannerFileSlides(slidesBytes);
+            logger.info("Total slides stored: {}", slidesBytes.size());
+        }
 
-            if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
-                entity.setBannerFileTwo(bannerFileTwo.getBytes());
-            }
-
-            if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
-                entity.setBannerFileThree(bannerFileThree.getBytes());
-            }
-
-            if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
-                entity.setBannerFileFour(bannerFileFour.getBytes());
-            }
-
-            BannerEntity updatedEntity = bannerRepository.save(entity);
-            logger.info("Banner updated with ID: {}", updatedEntity.getBannerId());
-            return convertToResponseDto(updatedEntity);
+        // Update bannerFileTwo if provided
+        if (bannerFileTwo != null && !bannerFileTwo.isEmpty()) {
+            byte[] bytes = bannerFileTwo.getBytes();
+            entity.setBannerFileTwo(bytes);
+            logger.info("Set bannerFileTwo: {} ({} bytes)",
+                    bannerFileTwo.getOriginalFilename(), bytes.length);
         } else {
-            logger.warn("Banner not found for update with ID: {}", bannerId);
-            throw new RuntimeException("Banner not found");
+            logger.info("bannerFileTwo not updated (null or empty)");
+        }
+
+        // Update bannerFileThree if provided
+        if (bannerFileThree != null && !bannerFileThree.isEmpty()) {
+            byte[] bytes = bannerFileThree.getBytes();
+            entity.setBannerFileThree(bytes);
+            logger.info("Set bannerFileThree: {} ({} bytes)",
+                    bannerFileThree.getOriginalFilename(), bytes.length);
+        } else {
+            logger.info("bannerFileThree not updated (null or empty)");
+        }
+
+        // Update bannerFileFour if provided
+        if (bannerFileFour != null && !bannerFileFour.isEmpty()) {
+            byte[] bytes = bannerFileFour.getBytes();
+            entity.setBannerFileFour(bytes);
+            logger.info("Set bannerFileFour: {} ({} bytes)",
+                    bannerFileFour.getOriginalFilename(), bytes.length);
+        } else {
+            logger.warn("bannerFileFour is null or empty! Not updating.");
+        }
+
+        // Save the entity
+        logger.info("Saving banner entity...");
+        try {
+            BannerEntity updatedEntity = bannerRepository.save(entity);
+            logger.info("Banner saved successfully with ID: {}", updatedEntity.getBannerId());
+
+            // Verify the saved data
+            logger.info("Verifying saved data:");
+            logger.info("  - bannerFileTwo present: {}", updatedEntity.getBannerFileTwo() != null);
+            logger.info("  - bannerFileThree present: {}", updatedEntity.getBannerFileThree() != null);
+            logger.info("  - bannerFileFour present: {}", updatedEntity.getBannerFileFour() != null);
+            logger.info("  - bannerFileSlides count: {}",
+                    updatedEntity.getBannerFileSlides() != null ?
+                            updatedEntity.getBannerFileSlides().size() : 0);
+
+            // If bannerFileFour should be present but isn't, log warning
+            if (bannerFileFour != null && !bannerFileFour.isEmpty() &&
+                    updatedEntity.getBannerFileFour() == null) {
+                logger.error("CRITICAL: bannerFileFour was provided but not saved to database!");
+            }
+
+            logger.info("=== BANNER SERVICE UPDATE END ===");
+            return convertToResponseDto(updatedEntity);
+
+        } catch (Exception e) {
+            logger.error("Error saving banner: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to save banner: " + e.getMessage(), e);
         }
     }
 

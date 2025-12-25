@@ -66,13 +66,32 @@ public class BannerController {
             @RequestPart(value = "bannerFileTwo", required = false) MultipartFile bannerFileTwo,
             @RequestPart(value = "bannerFileThree", required = false) MultipartFile bannerFileThree,
             @RequestPart(value = "bannerFileFour", required = false) MultipartFile bannerFileFour) throws Exception {
+
+        logger.info("=== UPDATE BANNER REQUEST START ===");
         logger.info("Received update banner request for ID: {}", bannerId);
+        logger.info("pageName: {}", pageName);
+        logger.info("bannerFileSlides: {}", bannerFileSlides != null ? bannerFileSlides.size() + " file(s)" : "null");
+        logger.info("bannerFileTwo: {}", bannerFileTwo != null ?
+                "Present - " + bannerFileTwo.getOriginalFilename() + " (" + bannerFileTwo.getSize() + " bytes)" : "null");
+        logger.info("bannerFileThree: {}", bannerFileThree != null ?
+                "Present - " + bannerFileThree.getOriginalFilename() + " (" + bannerFileThree.getSize() + " bytes)" : "null");
+        logger.info("bannerFileFour: {}", bannerFileFour != null ?
+                "Present - " + bannerFileFour.getOriginalFilename() + " (" + bannerFileFour.getSize() + " bytes)" : "null");
+
         BannerRequestDto dto = new BannerRequestDto();
         if (pageName != null) {
             dto.setPageName(pageName);
         }
-        BannerResponseDto responseDto = bannerService.updateBanner(bannerId, dto, bannerFileSlides, bannerFileTwo, bannerFileThree, bannerFileFour);
-        return ResponseEntity.ok(responseDto);
+
+        try {
+            BannerResponseDto responseDto = bannerService.updateBanner(bannerId, dto, bannerFileSlides, bannerFileTwo, bannerFileThree, bannerFileFour);
+            logger.info("=== UPDATE BANNER REQUEST END - SUCCESS ===");
+            return ResponseEntity.ok(responseDto);
+        } catch (Exception e) {
+            logger.error("=== UPDATE BANNER REQUEST END - ERROR ===");
+            logger.error("Error updating banner: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @DeleteMapping("/delete-Banner/{bannerId}")
@@ -97,7 +116,7 @@ public class BannerController {
         return ResponseEntity.ok(image);
     }
 
-    @GetMapping(value = "/get-Banner-File-Three-Image/{ibannerIdd}/filethree", produces = MediaType.IMAGE_JPEG_VALUE)
+    @GetMapping(value = "/get-Banner-File-Three-Image/{bannerId}/filethree", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> getBannerFileThreeImage(@PathVariable Long bannerId) {
         logger.info("Received get file three image request for banner ID: {}", bannerId);
         byte[] image = bannerService.getBannerFileThreeImage(bannerId);
