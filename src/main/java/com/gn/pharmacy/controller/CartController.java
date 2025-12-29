@@ -188,6 +188,7 @@ public class CartController {
                 map.put("title", p.getProductName());
                 map.put("price", p.getProductPrice());
                 map.put("imageUrl", "/api/products/" + p.getProductId() + "/image");
+                map.put("productSizes", p.getProductSizes());
                 map.put("subImageUrls", getSubImageUrls(p.getProductId(), p.getProductSubImages() != null ? p.getProductSubImages().size() : 0));
             } else if (item.getMbp() != null) {
                 MbPEntity m = item.getMbp();
