@@ -4,6 +4,7 @@ public class ShippingAddressResponseDto {
 
     private Long shippingId;
     private UserDto user;
+    private String customerName;
     private String customerPhone;
     private String customerEmail;
     private String shippingAddress;
@@ -17,9 +18,10 @@ public class ShippingAddressResponseDto {
     // Default constructor
     public ShippingAddressResponseDto() {}
 
-    public ShippingAddressResponseDto(Long shippingId, UserDto user, String customerPhone, String customerEmail, String shippingAddress, Integer flat_no, String shippingCity, String shippingState, String shippingPincode, String nearBy, String landmark) {
+    public ShippingAddressResponseDto(Long shippingId, UserDto user, String customerName, String customerPhone, String customerEmail, String shippingAddress, Integer flat_no, String shippingCity, String shippingState, String shippingPincode, String nearBy, String landmark) {
         this.shippingId = shippingId;
         this.user = user;
+        this.customerName = customerName;
         this.customerPhone = customerPhone;
         this.customerEmail = customerEmail;
         this.shippingAddress = shippingAddress;
@@ -69,6 +71,14 @@ public class ShippingAddressResponseDto {
 
     public UserDto getUser() { return user; }
     public void setUser(UserDto user) { this.user = user; }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
 
     public String getCustomerPhone() { return customerPhone; }
     public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }

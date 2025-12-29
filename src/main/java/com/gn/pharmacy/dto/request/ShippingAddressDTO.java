@@ -4,6 +4,7 @@ package com.gn.pharmacy.dto.request;
 public class ShippingAddressDTO {
 
     private Long shippingId;
+    private String customerName;
     private String customerPhone;
     private String customerEmail;
     private String shippingAddress;
@@ -30,6 +31,15 @@ public class ShippingAddressDTO {
 
     public Long getShippingId() { return shippingId; }
     public void setShippingId(Long shippingId) { this.shippingId = shippingId; }
+
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
 
     public String getCustomerPhone() { return customerPhone; }
     public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }

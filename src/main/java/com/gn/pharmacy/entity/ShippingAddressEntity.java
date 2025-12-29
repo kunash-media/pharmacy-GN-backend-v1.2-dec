@@ -19,6 +19,9 @@ public class ShippingAddressEntity {
     @JsonBackReference
     private UserEntity user;
 
+    @Column(name = "customer_name")
+    private String customerName;
+
     @Column(name = "customer_phone")
     private String customerPhone;
 
@@ -50,9 +53,10 @@ public class ShippingAddressEntity {
     public ShippingAddressEntity() {
     }
 
-    public ShippingAddressEntity(Long shippingId, UserEntity user, String customerPhone, String customerEmail, String shippingAddress, int flat_no, String shippingCity, String shippingState, String nearBy, String shippingPincode, String landmark) {
+    public ShippingAddressEntity(Long shippingId, UserEntity user,String customerName, String customerPhone, String customerEmail, String shippingAddress, int flat_no, String shippingCity, String shippingState, String nearBy, String shippingPincode, String landmark) {
         this.shippingId = shippingId;
         this.user = user;
+        this.customerName = customerName;
         this.customerPhone = customerPhone;
         this.customerEmail = customerEmail;
         this.shippingAddress = shippingAddress;
@@ -91,6 +95,14 @@ public class ShippingAddressEntity {
 
     public void setUser(UserEntity user) {
         this.user = user;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public String getCustomerPhone() {
