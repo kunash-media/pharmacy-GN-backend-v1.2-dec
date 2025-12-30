@@ -3664,3 +3664,135 @@ java.lang.RuntimeException: No inventory batches found for MbP ID: 4
 2025-12-31T01:22:16.709+05:30  INFO 14756 --- [Pharmacy] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
 2025-12-31T01:22:16.712+05:30  INFO 14756 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
 2025-12-31T01:22:16.721+05:30  INFO 14756 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-31T01:22:22.193+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : Starting PharmacyApplication using Java 24.0.2 with PID 19924 (C:\Pharmacy-Project\pharmacy-GN-backend-v1.2\target\classes started by admim in C:\Pharmacy-Project\pharmacy-GN-backend-v1.2)
+2025-12-31T01:22:22.197+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : No active profile set, falling back to 1 default profile: "default"
+2025-12-31T01:22:22.277+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.b.devtools.restart.ChangeableUrls    : The Class-Path manifest attribute in C:\Users\admim\.m2\repository\io\github\cdimascio\java-dotenv\5.2.2\java-dotenv-5.2.2.jar referenced one or more files that do not exist: file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/kotlin-stdlib-1.4.0.jar,file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/kotlin-stdlib-common-1.4.0.jar,file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/annotations-13.0.jar
+2025-12-31T01:22:22.277+05:30  INFO 19924 --- [Pharmacy] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2025-12-31T01:22:22.277+05:30  INFO 19924 --- [Pharmacy] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2025-12-31T01:22:23.431+05:30  INFO 19924 --- [Pharmacy] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T01:22:23.572+05:30  INFO 19924 --- [Pharmacy] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 129 ms. Found 16 JPA repository interfaces.
+2025-12-31T01:22:24.431+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T01:22:24.453+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T01:22:24.454+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-12-31T01:22:24.513+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T01:22:24.514+05:30  INFO 19924 --- [Pharmacy] [restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2236 ms
+2025-12-31T01:22:24.764+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T01:22:24.846+05:30  INFO 19924 --- [Pharmacy] [restartedMain] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.26.Final
+2025-12-31T01:22:24.895+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T01:22:25.260+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T01:22:25.295+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T01:22:25.485+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@19d234c8
+2025-12-31T01:22:25.487+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T01:22:25.580+05:30  INFO 19924 --- [Pharmacy] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0.41
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2025-12-31T01:22:27.113+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T01:22:27.385+05:30  INFO 19924 --- [Pharmacy] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:22:27.825+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T01:22:29.245+05:30  INFO 19924 --- [Pharmacy] [restartedMain] c.g.p.s.s.PrescriptionServiceImpl        : [PrescriptionService] Service initialized
+2025-12-31T01:22:29.255+05:30  INFO 19924 --- [Pharmacy] [restartedMain] c.g.p.controller.PrescriptionController  : [PrescriptionController] Controller initialized
+2025-12-31T01:22:29.383+05:30  WARN 19924 --- [Pharmacy] [restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-12-31T01:22:29.590+05:30 DEBUG 19924 --- [Pharmacy] [restartedMain] s.w.s.m.m.a.RequestMappingHandlerMapping : 132 mappings in 'requestMappingHandlerMapping'
+2025-12-31T01:22:29.649+05:30 DEBUG 19924 --- [Pharmacy] [restartedMain] o.s.w.s.handler.SimpleUrlHandlerMapping  : Patterns [/webjars/**, /**] in 'resourceHandlerMapping'
+2025-12-31T01:22:29.679+05:30 DEBUG 19924 --- [Pharmacy] [restartedMain] s.w.s.m.m.a.RequestMappingHandlerAdapter : ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2025-12-31T01:22:29.729+05:30 DEBUG 19924 --- [Pharmacy] [restartedMain] .m.m.a.ExceptionHandlerExceptionResolver : ControllerAdvice beans: 0 @ExceptionHandler, 1 ResponseBodyAdvice
+2025-12-31T01:22:29.870+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2025-12-31T01:22:29.913+05:30  INFO 19924 --- [Pharmacy] [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T01:22:29.926+05:30  INFO 19924 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : Started PharmacyApplication in 8.465 seconds (process running for 9.274)
+2025-12-31T01:22:34.062+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-12-31T01:22:34.062+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-12-31T01:22:34.062+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected StandardServletMultipartResolver
+2025-12-31T01:22:34.062+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected AcceptHeaderLocaleResolver
+2025-12-31T01:22:34.063+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected FixedThemeResolver
+2025-12-31T01:22:34.064+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@c76a63f
+2025-12-31T01:22:34.064+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected org.springframework.web.servlet.support.SessionFlashMapManager@4ac85d05
+2025-12-31T01:22:34.065+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2025-12-31T01:22:34.065+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 3 ms
+2025-12-31T01:22:34.077+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : PATCH "/api/products/patch-product/19", parameters={multipart}
+2025-12-31T01:22:34.107+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.gn.pharmacy.controller.ProductController#patchProduct(Long, String, MultipartFile, List)
+2025-12-31T01:22:34.132+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] .m.m.a.RequestPartMethodArgumentResolver : Read "application/octet-stream" to ["{    "isApproved" : true}"]
+2025-12-31T01:22:34.135+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-2] c.g.p.controller.ProductController       : Partially updating product with ID: 19
+2025-12-31T01:22:34.330+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-2] c.g.p.controller.ProductController       : Product patched successfully: Aspirin 500mg Tablets
+2025-12-31T01:22:34.359+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
+2025-12-31T01:22:34.360+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [com.gn.pharmacy.dto.response.ProductResponseDto@297eb79c]
+2025-12-31T01:22:34.409+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2025-12-31T01:23:28.089+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] o.s.web.servlet.DispatcherServlet        : PATCH "/api/products/patch-product/19", parameters={multipart}
+2025-12-31T01:23:28.092+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.gn.pharmacy.controller.ProductController#patchProduct(Long, String, MultipartFile, List)
+2025-12-31T01:23:28.093+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] .m.m.a.RequestPartMethodArgumentResolver : Read "application/json" to ["{<EOL><EOL>    "isApproved": true<EOL><EOL>}"]
+2025-12-31T01:23:28.094+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-3] c.g.p.controller.ProductController       : Partially updating product with ID: 19
+2025-12-31T01:23:28.106+05:30  INFO 19924 --- [Pharmacy] [http-nio-8083-exec-3] c.g.p.controller.ProductController       : Product patched successfully: Aspirin 500mg Tablets
+2025-12-31T01:23:28.107+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
+2025-12-31T01:23:28.107+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [com.gn.pharmacy.dto.response.ProductResponseDto@4b210df2]
+2025-12-31T01:23:28.121+05:30 DEBUG 19924 --- [Pharmacy] [http-nio-8083-exec-3] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2025-12-31T01:26:53.894+05:30  INFO 19924 --- [Pharmacy] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T01:26:53.900+05:30  INFO 19924 --- [Pharmacy] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T01:26:53.912+05:30  INFO 19924 --- [Pharmacy] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:26:53.919+05:30  INFO 19924 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T01:26:53.932+05:30  INFO 19924 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2025-12-31T01:27:02.614+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : Starting PharmacyApplication using Java 24.0.2 with PID 14584 (C:\Pharmacy-Project\pharmacy-GN-backend-v1.2\target\classes started by admim in C:\Pharmacy-Project\pharmacy-GN-backend-v1.2)
+2025-12-31T01:27:02.618+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : No active profile set, falling back to 1 default profile: "default"
+2025-12-31T01:27:02.706+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.b.devtools.restart.ChangeableUrls    : The Class-Path manifest attribute in C:\Users\admim\.m2\repository\io\github\cdimascio\java-dotenv\5.2.2\java-dotenv-5.2.2.jar referenced one or more files that do not exist: file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/kotlin-stdlib-1.4.0.jar,file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/kotlin-stdlib-common-1.4.0.jar,file:/C:/Users/admim/.m2/repository/io/github/cdimascio/java-dotenv/5.2.2/annotations-13.0.jar
+2025-12-31T01:27:02.707+05:30  INFO 14584 --- [Pharmacy] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2025-12-31T01:27:02.707+05:30  INFO 14584 --- [Pharmacy] [restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2025-12-31T01:27:04.519+05:30  INFO 14584 --- [Pharmacy] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-12-31T01:27:04.718+05:30  INFO 14584 --- [Pharmacy] [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 179 ms. Found 16 JPA repository interfaces.
+2025-12-31T01:27:05.790+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2025-12-31T01:27:05.815+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-12-31T01:27:05.815+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.44]
+2025-12-31T01:27:05.903+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-12-31T01:27:05.903+05:30  INFO 14584 --- [Pharmacy] [restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3195 ms
+2025-12-31T01:27:06.441+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-12-31T01:27:06.535+05:30  INFO 14584 --- [Pharmacy] [restartedMain] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.26.Final
+2025-12-31T01:27:06.602+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-12-31T01:27:07.085+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-12-31T01:27:07.138+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-12-31T01:27:07.469+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@14d29f74
+2025-12-31T01:27:07.471+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-12-31T01:27:07.693+05:30  INFO 14584 --- [Pharmacy] [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0.41
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2025-12-31T01:27:09.288+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-12-31T01:27:09.531+05:30  INFO 14584 --- [Pharmacy] [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:27:09.938+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2025-12-31T01:27:11.437+05:30  INFO 14584 --- [Pharmacy] [restartedMain] c.g.p.s.s.PrescriptionServiceImpl        : [PrescriptionService] Service initialized
+2025-12-31T01:27:11.445+05:30  INFO 14584 --- [Pharmacy] [restartedMain] c.g.p.controller.PrescriptionController  : [PrescriptionController] Controller initialized
+2025-12-31T01:27:11.584+05:30  WARN 14584 --- [Pharmacy] [restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-12-31T01:27:11.836+05:30 DEBUG 14584 --- [Pharmacy] [restartedMain] s.w.s.m.m.a.RequestMappingHandlerMapping : 132 mappings in 'requestMappingHandlerMapping'
+2025-12-31T01:27:11.886+05:30 DEBUG 14584 --- [Pharmacy] [restartedMain] o.s.w.s.handler.SimpleUrlHandlerMapping  : Patterns [/webjars/**, /**] in 'resourceHandlerMapping'
+2025-12-31T01:27:11.913+05:30 DEBUG 14584 --- [Pharmacy] [restartedMain] s.w.s.m.m.a.RequestMappingHandlerAdapter : ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2025-12-31T01:27:11.956+05:30 DEBUG 14584 --- [Pharmacy] [restartedMain] .m.m.a.ExceptionHandlerExceptionResolver : ControllerAdvice beans: 0 @ExceptionHandler, 1 ResponseBodyAdvice
+2025-12-31T01:27:12.140+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2025-12-31T01:27:12.185+05:30  INFO 14584 --- [Pharmacy] [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path '/'
+2025-12-31T01:27:12.201+05:30  INFO 14584 --- [Pharmacy] [restartedMain] com.gn.pharmacy.PharmacyApplication      : Started PharmacyApplication in 10.592 seconds (process running for 11.703)
+2025-12-31T01:27:51.641+05:30  INFO 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-12-31T01:27:51.642+05:30  INFO 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-12-31T01:27:51.642+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected StandardServletMultipartResolver
+2025-12-31T01:27:51.642+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected AcceptHeaderLocaleResolver
+2025-12-31T01:27:51.642+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected FixedThemeResolver
+2025-12-31T01:27:51.643+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@2b71c58e
+2025-12-31T01:27:51.643+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Detected org.springframework.web.servlet.support.SessionFlashMapManager@37f6a7a0
+2025-12-31T01:27:51.644+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2025-12-31T01:27:51.644+05:30  INFO 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+2025-12-31T01:27:51.655+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : PATCH "/api/products/patch-product/19", parameters={multipart}
+2025-12-31T01:27:51.689+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.gn.pharmacy.controller.ProductController#patchProduct(Long, String, MultipartFile, List)
+2025-12-31T01:27:51.713+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] .m.m.a.RequestPartMethodArgumentResolver : Read "application/json" to ["{<EOL><EOL>    "isApproved": true<EOL><EOL>}"]
+2025-12-31T01:27:51.716+05:30  INFO 14584 --- [Pharmacy] [http-nio-8083-exec-2] c.g.p.controller.ProductController       : Partially updating product with ID: 19
+2025-12-31T01:27:51.938+05:30  INFO 14584 --- [Pharmacy] [http-nio-8083-exec-2] c.g.p.controller.ProductController       : Product patched successfully: Aspirin 500mg Tablets
+2025-12-31T01:27:51.974+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Using 'application/json', given [*/*] and supported [application/json, application/*+json]
+2025-12-31T01:27:51.976+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.w.s.m.m.a.HttpEntityMethodProcessor  : Writing [com.gn.pharmacy.dto.response.ProductResponseDto@26ea7c9c]
+2025-12-31T01:27:52.030+05:30 DEBUG 14584 --- [Pharmacy] [http-nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Completed 200 OK
+2025-12-31T01:31:20.512+05:30  INFO 14584 --- [Pharmacy] [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2025-12-31T01:31:20.522+05:30  INFO 14584 --- [Pharmacy] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2025-12-31T01:31:20.532+05:30  INFO 14584 --- [Pharmacy] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2025-12-31T01:31:20.539+05:30  INFO 14584 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2025-12-31T01:31:20.556+05:30  INFO 14584 --- [Pharmacy] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.

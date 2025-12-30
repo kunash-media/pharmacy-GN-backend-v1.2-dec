@@ -282,6 +282,7 @@ public class ProductServiceImpl implements ProductService {
 
 
     @Override
+    @Transactional
     public ProductResponseDto patchProduct(Long id, ProductRequestDto requestDto) throws Exception {
         logger.debug("Patching product with ID: {}", id);
 
@@ -290,6 +291,10 @@ public class ProductServiceImpl implements ProductService {
                     logger.error("Product not found with ID: {}", id);
                     return new IllegalArgumentException("Product not found with ID: " + id);
                 });
+
+        // Log the approved values
+        logger.debug("Request approved: {}, Current entity approved: {}",
+                requestDto.isApproved(), entity.isApproved());
 
         // ==================== VALIDATION FOR PATCHED FIELDS ====================
         // Only validate fields that the client is actually trying to update
@@ -345,7 +350,16 @@ public class ProductServiceImpl implements ProductService {
         }
         // ==================== END OF VALIDATION ====================
 
-        // Patch only non-null fields (existing flow unchanged)
+        // ==================== PATCH FIELDS ====================
+
+        // Patch approved field - ALWAYS update if different from current
+        if (requestDto.isApproved() != entity.isApproved()) {
+            logger.debug("Updating approved from {} to {}",
+                    entity.isApproved(), requestDto.isApproved());
+            entity.setApproved(requestDto.isApproved());
+        }
+
+        // Patch only non-null fields
         if (requestDto.getSku() != null) entity.setSku(requestDto.getSku());
         if (requestDto.getProductName() != null) entity.setProductName(requestDto.getProductName());
         if (requestDto.getProductCategory() != null) entity.setProductCategory(requestDto.getProductCategory());
@@ -369,16 +383,19 @@ public class ProductServiceImpl implements ProductService {
         if (requestDto.getExpDate() != null) entity.setExpDate(requestDto.getExpDate());
         if (requestDto.getBatchNo() != null) entity.setBatchNo(requestDto.getBatchNo());
         if (requestDto.getRating() != null) entity.setRating(requestDto.getRating());
-        if (requestDto.getBenefitsList() != null && !requestDto.getBenefitsList().isEmpty()) {
+
+        // For list fields, only update if the request contains a non-empty list
+        if (requestDto.getBenefitsList() != null) {
             entity.setBenefitsList(requestDto.getBenefitsList());
         }
-        if (requestDto.getIngredientsList() != null && !requestDto.getIngredientsList().isEmpty()) {
+        if (requestDto.getIngredientsList() != null) {
             entity.setIngredientsList(requestDto.getIngredientsList());
         }
-        if (requestDto.getDirectionsList() != null && !requestDto.getDirectionsList().isEmpty()) {
+        if (requestDto.getDirectionsList() != null) {
             entity.setDirectionsList(requestDto.getDirectionsList());
         }
-        if (requestDto.getCategoryPath() != null && !requestDto.getCategoryPath().isEmpty()) {
+
+        if (requestDto.getCategoryPath() != null) {
             entity.setCategoryPath(requestDto.getCategoryPath());
         }
 
@@ -386,6 +403,7 @@ public class ProductServiceImpl implements ProductService {
         if (requestDto.getProductMainImage() != null && !requestDto.getProductMainImage().isEmpty()) {
             entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
         }
+
         if (requestDto.getProductSubImages() != null) {
             List<byte[]> subImages = requestDto.getProductSubImages().stream()
                     .filter(file -> file != null && !file.isEmpty())
@@ -397,26 +415,27 @@ public class ProductServiceImpl implements ProductService {
                         }
                     })
                     .collect(Collectors.toList());
-            if (!subImages.isEmpty()) {
-                entity.setProductSubImages(subImages);
-            }
+            // Even if empty list is provided, update to empty
+            entity.setProductSubImages(subImages);
         }
+
         if (requestDto.getProductDynamicFields() != null) {
             entity.setProductDynamicFields(requestDto.getProductDynamicFields());
         }
+
         if (requestDto.getProductSizes() != null) {
             entity.setProductSizes(requestDto.getProductSizes());
         }
-
-        if(!requestDto.isApproved()){
-            entity.setApproved(requestDto.isApproved());
-        }
+        // ==================== END OF PATCH FIELDS ====================
 
         ProductEntity updatedEntity = productRepository.save(entity);
+
+        // Verify the update
+        logger.debug("After save - approved: {}", updatedEntity.isApproved());
         logger.debug("Product patched successfully with ID: {}", id);
+
         return mapToResponseDto(updatedEntity);
     }
-
 
 //    @Override
 //    public ProductResponseDto patchProduct(Long id, ProductRequestDto requestDto) throws Exception {
