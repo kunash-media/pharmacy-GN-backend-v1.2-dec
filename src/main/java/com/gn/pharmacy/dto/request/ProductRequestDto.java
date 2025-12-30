@@ -1,6 +1,5 @@
 package com.gn.pharmacy.dto.request;
 
-import jakarta.persistence.Column;
 import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.ArrayList;
