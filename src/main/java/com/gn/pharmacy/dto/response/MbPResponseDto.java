@@ -23,7 +23,7 @@ public class MbPResponseDto {
     private Boolean inStock;
     private Integer stockQuantity;
     private List<String> description = new ArrayList<>();
-    private List<String> sizes = new ArrayList<>();
+    private List<String> productSizes = new ArrayList<>();
     private List<String> features = new ArrayList<>();
     private String specifications;
     private Date createdAt;
@@ -85,8 +85,14 @@ public class MbPResponseDto {
     public List<String> getDescription() { return description; }
     public void setDescription(List<String> description) { this.description = description; }
 
-    public List<String> getSizes() { return sizes; }
-    public void setSizes(List<String> sizes) { this.sizes = sizes; }
+
+    public List<String> getProductSizes() {
+        return productSizes;
+    }
+
+    public void setProductSizes(List<String> productSizes) {
+        this.productSizes = productSizes;
+    }
 
     public List<String> getFeatures() { return features; }
     public void setFeatures(List<String> features) { this.features = features; }

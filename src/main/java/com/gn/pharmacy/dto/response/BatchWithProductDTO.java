@@ -13,18 +13,22 @@ public class BatchWithProductDTO {
     private LocalDateTime lastUpdated;
 
     // Product details
-    private Long productId;
-    private String productName;
-    private String sku;
-    private String brandName;
-    private Integer productTotalStock;  // Total stock across all batches of this product
+    // Product / MbP details (we'll use generic names)
+    private Long itemId;                    // productId OR mbpId
+    private String itemName;                // productName or MbP title
+    private String sku;                     // same field name in both entities
+    private String brandName;              // optional in MbP, can be null
+    private Integer productTotalStock;
+
+
 
     // Constructors
     public BatchWithProductDTO() {}
 
+
     public BatchWithProductDTO(Long inventoryId, String batchNo, Integer quantity,
                                String mfgDate, String expiryDate, String stockStatus,
-                               LocalDateTime lastUpdated, Long productId, String productName,
+                               LocalDateTime lastUpdated, Long itemId, String itemName,
                                String sku, String brandName, Integer productTotalStock) {
         this.inventoryId = inventoryId;
         this.batchNo = batchNo;
@@ -33,11 +37,27 @@ public class BatchWithProductDTO {
         this.expiryDate = expiryDate;
         this.stockStatus = stockStatus;
         this.lastUpdated = lastUpdated;
-        this.productId = productId;
-        this.productName = productName;
+        this.itemId = itemId;
+        this.itemName = itemName;
         this.sku = sku;
         this.brandName = brandName;
         this.productTotalStock = productTotalStock;
+    }
+
+    public Long getItemId() {
+        return itemId;
+    }
+
+    public void setItemId(Long itemId) {
+        this.itemId = itemId;
+    }
+
+    public String getItemName() {
+        return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
     }
 
     // All getters and setters
@@ -62,11 +82,6 @@ public class BatchWithProductDTO {
     public LocalDateTime getLastUpdated() { return lastUpdated; }
     public void setLastUpdated(LocalDateTime lastUpdated) { this.lastUpdated = lastUpdated; }
 
-    public Long getProductId() { return productId; }
-    public void setProductId(Long productId) { this.productId = productId; }
-
-    public String getProductName() { return productName; }
-    public void setProductName(String productName) { this.productName = productName; }
 
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }

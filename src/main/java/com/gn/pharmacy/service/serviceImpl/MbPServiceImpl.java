@@ -319,7 +319,7 @@ public class MbPServiceImpl implements MbPService {
         e.setInStock(d.getInStock());
         e.setStockQuantity(d.getStockQuantity());
         e.setDescription(d.getDescription());
-        e.setSizes(d.getSizes());
+        e.setProductSizes(d.getProductSizes());
         e.setFeatures(d.getFeatures());
         e.setSpecifications(d.getSpecifications());
 
@@ -360,7 +360,7 @@ public class MbPServiceImpl implements MbPService {
         if (d.getInStock() != null) e.setInStock(d.getInStock());
         if (d.getStockQuantity() != null) e.setStockQuantity(d.getStockQuantity());
         if (d.getDescription() != null && !d.getDescription().isEmpty()) e.setDescription(d.getDescription());
-        if (d.getSizes() != null && !d.getSizes().isEmpty()) e.setSizes(d.getSizes());
+        if (d.getProductSizes() != null && !d.getProductSizes().isEmpty()) e.setProductSizes(d.getProductSizes());
         if (d.getFeatures() != null && !d.getFeatures().isEmpty()) e.setFeatures(d.getFeatures());
         if (StringUtils.hasText(d.getSpecifications())) e.setSpecifications(d.getSpecifications());
 
@@ -407,7 +407,7 @@ public class MbPServiceImpl implements MbPService {
         d.setInStock(e.getInStock());
         d.setStockQuantity(e.getStockQuantity());
         d.setDescription(e.getDescription());
-        d.setSizes(e.getSizes());
+        d.setProductSizes(e.getProductSizes());
         d.setFeatures(e.getFeatures());
         d.setSpecifications(e.getSpecifications());
         d.setCreatedAt(e.getCreatedAt());

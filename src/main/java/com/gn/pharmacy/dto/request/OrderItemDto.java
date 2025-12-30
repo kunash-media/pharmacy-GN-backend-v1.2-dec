@@ -4,12 +4,15 @@ package com.gn.pharmacy.dto.request;
 public class OrderItemDto {
 
     private Long orderItemId;
+    private Long mbpId;
+
     private Long productId;
-    private int quantity;
+    private Integer quantity;
     private Double itemPrice;
     private Double itemOldPrice;
     private Double subtotal;
     private String itemName;
+
 
 
     // ADD THIS FIELD
@@ -21,6 +24,14 @@ public class OrderItemDto {
 
     public Long getOrderItemId() {
         return orderItemId;
+    }
+
+    public Long getMbpId() {
+        return mbpId;
+    }
+
+    public void setMbpId(Long mbpId) {
+        this.mbpId = mbpId;
     }
 
     public void setOrderItemId(Long orderItemId) {
@@ -35,11 +46,12 @@ public class OrderItemDto {
         this.productId = productId;
     }
 
-    public int getQuantity() {
+
+    public Integer getQuantity() {
         return quantity;
     }
 
-    public void setQuantity(int quantity) {
+    public void setQuantity(Integer quantity) {
         this.quantity = quantity;
     }
 

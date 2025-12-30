@@ -408,6 +408,10 @@ public class ProductServiceImpl implements ProductService {
             entity.setProductSizes(requestDto.getProductSizes());
         }
 
+        if(!requestDto.isApproved()){
+            entity.setApproved(requestDto.isApproved());
+        }
+
         ProductEntity updatedEntity = productRepository.save(entity);
         logger.debug("Product patched successfully with ID: {}", id);
         return mapToResponseDto(updatedEntity);

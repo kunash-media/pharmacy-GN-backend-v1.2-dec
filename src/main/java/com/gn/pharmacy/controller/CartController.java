@@ -117,12 +117,12 @@ public class CartController {
                 }
                 MbPEntity mbp = mbpOpt.get();
 
-                logger.debug("Found MBP: {}, sizes available: {}", mbp.getTitle(), mbp.getSizes());
+                logger.debug("Found MBP: {}, sizes available: {}", mbp.getTitle(), mbp.getProductSizes());
 
                 // Check size only if MBP has sizes defined and size is provided
-                if (mbp.getSizes() != null && !mbp.getSizes().isEmpty() &&
-                        !mbp.getSizes().contains(size) && !size.isEmpty()) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Invalid size for MBP. Available sizes: " + mbp.getSizes()));
+                if (mbp.getProductSizes() != null && !mbp.getProductSizes().isEmpty() &&
+                        !mbp.getProductSizes().contains(size) && !size.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Invalid size for MBP. Available sizes: " + mbp.getProductSizes()));
                 }
 
                 existing = cartItemRepository.findByUserAndMbpAndSelectedSize(user, mbp, size);
@@ -196,6 +196,7 @@ public class CartController {
                 map.put("itemId", m.getId());
                 map.put("title", m.getTitle());
                 map.put("price", m.getPrice());
+                map.put("productSizes", m.getProductSizes());
                 map.put("imageUrl", "/api/mb/products/" + m.getId() + "/image");
                 map.put("subImageUrls", getSubImageUrls(m.getId(), m.getProductSubImages() != null ? m.getProductSubImages().size() : 0));
             }
@@ -412,7 +413,7 @@ public class CartController {
                     Optional<MbPEntity> m = mbpRepository.findById(mbpId);
                     if (m.isPresent()) {
                         // Check size only if MBP has sizes
-                        if (m.get().getSizes() != null && !m.get().getSizes().contains(size)) {
+                        if (m.get().getProductSizes() != null && !m.get().getProductSizes().contains(size)) {
                             continue; // Skip invalid size
                         }
                         Optional<CartItemEntity> existing = cartItemRepository.findByUserAndMbpAndSelectedSize(user, m.get(), size);

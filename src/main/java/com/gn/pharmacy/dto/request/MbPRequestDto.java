@@ -13,8 +13,6 @@ public class MbPRequestDto {
     private List<Double> price = new ArrayList<>();
     private List<Double> originalPrice = new ArrayList<>();
 
-//    private Double price;
-//    private Double originalPrice;
     private Integer discount;
     private Double rating;
     private Integer reviewCount;
@@ -22,7 +20,7 @@ public class MbPRequestDto {
     private Boolean inStock;
     private Integer stockQuantity;
     private List<String> description = new ArrayList<>();
-    private List<String> sizes = new ArrayList<>();
+    private List<String> productSizes = new ArrayList<>();
     private List<String> features = new ArrayList<>();
     private MultipartFile mainImage;
     private List<MultipartFile> subImages = new ArrayList<>();
@@ -79,8 +77,13 @@ public class MbPRequestDto {
     public List<String> getDescription() { return description; }
     public void setDescription(List<String> description) { this.description = description; }
 
-    public List<String> getSizes() { return sizes; }
-    public void setSizes(List<String> sizes) { this.sizes = sizes; }
+    public List<String> getProductSizes() {
+        return productSizes;
+    }
+
+    public void setProductSizes(List<String> productSizes) {
+        this.productSizes = productSizes;
+    }
 
     public List<String> getFeatures() { return features; }
     public void setFeatures(List<String> features) { this.features = features; }

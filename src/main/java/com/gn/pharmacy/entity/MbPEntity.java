@@ -26,9 +26,6 @@ public class MbPEntity {
     @Column(name = "sub_category")
     private String subCategory;
 
-//    private Double price;
-//    private Double originalPrice;
-
     // CHANGED: Now List<Double> instead of Double
     @ElementCollection
     @CollectionTable(name = "mbp_prices", joinColumns = @JoinColumn(name = "mbp_id"))
@@ -56,7 +53,7 @@ public class MbPEntity {
     @ElementCollection
     @CollectionTable(name = "mbp_sizes", joinColumns = @JoinColumn(name = "mbp_id"))
     @Column(name = "size")
-    private List<String> sizes = new ArrayList<>();
+    private List<String> productSizes = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "mbp_features", joinColumns = @JoinColumn(name = "mbp_id"))
@@ -88,6 +85,11 @@ public class MbPEntity {
 
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private boolean isDeleted = false;
+
+
+    // Add the new field for inventory batches (mirroring ProductEntity structure)
+    @OneToMany(mappedBy = "mbp", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<InventoryEntity> inventoryBatches = new ArrayList<>();
 
     //NEW DELETED PRODUCT
     public static Specification<MbPEntity> notDeleted() {
@@ -148,8 +150,14 @@ public class MbPEntity {
     public List<String> getDescription() { return description; }
     public void setDescription(List<String> description) { this.description = description; }
 
-    public List<String> getSizes() { return sizes; }
-    public void setSizes(List<String> sizes) { this.sizes = sizes; }
+
+    public List<String> getProductSizes() {
+        return productSizes;
+    }
+
+    public void setProductSizes(List<String> productSizes) {
+        this.productSizes = productSizes;
+    }
 
     public List<String> getFeatures() { return features; }
     public void setFeatures(List<String> features) { this.features = features; }
@@ -172,5 +180,14 @@ public class MbPEntity {
 
     public void setDeleted(boolean deleted) {
         isDeleted = deleted;
+    }
+
+
+    public List<InventoryEntity> getInventoryBatches() {
+        return inventoryBatches;
+    }
+
+    public void setInventoryBatches(List<InventoryEntity> inventoryBatches) {
+        this.inventoryBatches = inventoryBatches;
     }
 }

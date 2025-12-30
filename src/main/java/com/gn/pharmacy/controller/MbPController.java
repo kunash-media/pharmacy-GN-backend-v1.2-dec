@@ -212,7 +212,7 @@ public class MbPController {
         }
     }
 
-    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PatchMapping(value = "/update-mb-product/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MbPResponseDto> patchMbProduct(
             @PathVariable Long id,
             @RequestPart(value = "productData", required = false) String productDataJson,

@@ -13,18 +13,24 @@ public class BatchInfoDTO {
     private String stockStatus;      // New
     private LocalDateTime lastUpdated;
 
+
+    // NEW fields
+    private Long productId;   // optional - for ProductEntity
+    private Long mbpId;       // optional - for MbPEntity
+
     public BatchInfoDTO() {}
 
-    public BatchInfoDTO(String batchNo, Integer quantity, String expiryDate, String mfgDate) {
+    public BatchInfoDTO(String batchNo, Integer quantity, String expiryDate, String mfgDate, LocalDateTime lastUpdated) {
         this.batchNo = batchNo;
         this.quantity = quantity;
         this.expiryDate = expiryDate;
         this.mfgDate = mfgDate;
+        this.lastUpdated = lastUpdated;
     }
 
-    public BatchInfoDTO(Long inventoryId, String batchNo, Integer quantity,
-                        String mfgDate, String expiryDate, String stockStatus,
-                        LocalDateTime lastUpdated) {
+    public BatchInfoDTO(Long inventoryId, String batchNo, Integer quantity, String mfgDate,
+                        String expiryDate, String stockStatus, LocalDateTime lastUpdated,
+                        Long productId, Long mbpId) {
         this.inventoryId = inventoryId;
         this.batchNo = batchNo;
         this.quantity = quantity;
@@ -32,6 +38,28 @@ public class BatchInfoDTO {
         this.expiryDate = expiryDate;
         this.stockStatus = stockStatus;
         this.lastUpdated = lastUpdated;
+        this.productId = productId;
+        this.mbpId = mbpId;
+    }
+
+    public BatchInfoDTO(Long inventoryId, String batchNo, Integer quantity, String mfgDate, String expDate, String stockStatus, LocalDateTime lastUpdated) {
+    }
+
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
+    }
+
+    public Long getMbpId() {
+        return mbpId;
+    }
+
+    public void setMbpId(Long mbpId) {
+        this.mbpId = mbpId;
     }
 
     // Getters and Setters

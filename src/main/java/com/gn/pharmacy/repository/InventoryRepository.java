@@ -33,4 +33,8 @@ public interface InventoryRepository extends JpaRepository<InventoryEntity, Long
     Page<InventoryEntity> findAllWithProduct(Pageable pageable);
 
 
+    Page<InventoryEntity> findByMbpId(Long mbpId, Pageable pageable);
+
+
+
    }

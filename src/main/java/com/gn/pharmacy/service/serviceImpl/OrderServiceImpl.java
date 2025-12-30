@@ -5,11 +5,8 @@ import com.gn.pharmacy.dto.request.OrderRequestDto;
 import com.gn.pharmacy.dto.response.OrderResponseDto;
 import com.gn.pharmacy.entity.*;
 
-import com.gn.pharmacy.repository.OrderItemRepository;
+import com.gn.pharmacy.repository.*;
 
-import com.gn.pharmacy.repository.OrderRepository;
-import com.gn.pharmacy.repository.ProductRepository;
-import com.gn.pharmacy.repository.UserRepository;
 import com.gn.pharmacy.service.OrderService;
 
 import org.slf4j.Logger;
@@ -22,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,90 +35,286 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final MbPRepository mbpRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                            ProductRepository productRepository, UserRepository userRepository) {
+                            ProductRepository productRepository, UserRepository userRepository, MbPRepository mbpRepository) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.mbpRepository =  mbpRepository;
     }
+
 
 
     @Override
     public OrderResponseDto createOrder(OrderRequestDto orderRequestDto) {
 
-        logger.info("Creating new order");
+        logger.info("Creating new order for userId: {}", orderRequestDto.getUserId());
 
-        OrderEntity orderEntity = new OrderEntity();
-
+        // Validate user
         UserEntity user = userRepository.findById(orderRequestDto.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + orderRequestDto.getUserId()));
-        orderEntity.setUser(user);
 
+        OrderEntity orderEntity = new OrderEntity();
+        orderEntity.setUser(user);
         orderEntity.setOrderDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a")));
         mapOrderFields(orderRequestDto, orderEntity);
 
+        // Save order first to get orderId (needed for order items)
         OrderEntity savedEntity = orderRepository.save(orderEntity);
 
-        // NEW FIX : Deduct product quantities
-        // Deduct from actual inventory batches (FIFO: oldest batches first)
+        List<OrderItemEntity> orderItemsToSave = new ArrayList<>();
+
+        // Process inventory deduction and validate order items
+        // Process inventory deduction and validate order items
         if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
+
             for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
-                if (itemDto.getProductId() == null || itemDto.getQuantity() <= 0) {
-                    continue;
+
+                if (itemDto.getQuantity() == null || itemDto.getQuantity() <= 0) {
+                    throw new RuntimeException("Invalid quantity for item: " + itemDto.getItemName());
                 }
 
-                // Fetch product with inventory batches
-                ProductEntity product = productRepository.findById(itemDto.getProductId())
-                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
+                Long productId = itemDto.getProductId();
+                Long mbpId = itemDto.getMbpId();
 
-                // Load inventory batches (assuming lazy, but since we're in transaction, it's ok)
-                List<InventoryEntity> batches = product.getInventoryBatches();
+                // CRITICAL VALIDATION: Exactly one of productId or mbpId must be present
+                if ((productId == null && mbpId == null) || (productId != null && mbpId != null)) {
+                    throw new RuntimeException(
+                            "Invalid order item: exactly one of 'productId' or 'mbpId' must be provided. " +
+                                    "Received productId=" + productId + ", mbpId=" + mbpId +
+                                    ", itemName=" + itemDto.getItemName()
+                    );
+                }
+
+                List<InventoryEntity> batches = null;
+                Object parentEntity = null;
+                Long itemId = null;
+                String itemType = "";
+
+                if (productId != null) {
+                    ProductEntity product = productRepository.findById(productId)
+                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
+                    batches = product.getInventoryBatches();
+                    parentEntity = product;
+                    itemId = productId;
+                    itemType = "Product";
+                } else { // mbpId != null
+                    MbPEntity mbp = mbpRepository.findById(mbpId)
+                            .orElseThrow(() -> new RuntimeException("MbP product not found with ID: " + mbpId));
+                    batches = mbp.getInventoryBatches();
+                    parentEntity = mbp;
+                    itemId = mbpId;
+                    itemType = "MbP";
+                }
+
                 if (batches == null || batches.isEmpty()) {
-                    throw new RuntimeException("No inventory available for product ID: " + itemDto.getProductId());
+                    throw new RuntimeException("No inventory batches found for " + itemType + " ID: " + itemId);
                 }
 
                 int required = itemDto.getQuantity();
                 int remainingToDeduct = required;
 
-                // Sort batches by oldest first (you can change criteria: mfgDate, inventoryId, etc.)
-                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId)); // FIFO by ID (or parse mfgDate if needed)
+                // Sort by inventoryId (FIFO - oldest first)
+                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId));
 
                 for (InventoryEntity batch : batches) {
                     if (remainingToDeduct <= 0) break;
 
                     if (batch.getQuantity() > 0) {
-                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
-                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
-                        remainingToDeduct -= deductFromThisBatch;
+                        int deduct = Math.min(batch.getQuantity(), remainingToDeduct);
+                        batch.setQuantity(batch.getQuantity() - deduct);
+                        remainingToDeduct -= deduct;
 
-                        logger.info("Deducted {} from batch {} (product ID: {}). Remaining in batch: {}",
-                                deductFromThisBatch, batch.getBatchNo(), product.getProductId(), batch.getQuantity());
+                        logger.info("Deducted {} from batch {} ({} ID: {}). Remaining: {}",
+                                deduct, batch.getBatchNo(), itemType, itemId, batch.getQuantity());
                     }
                 }
 
                 if (remainingToDeduct > 0) {
-                    throw new RuntimeException("Insufficient inventory for product ID: " + itemDto.getProductId() +
-                            ". Required: " + required + ", Available across batches: " +
-                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
+                    int available = batches.stream().mapToInt(InventoryEntity::getQuantity).sum();
+                    throw new RuntimeException(
+                            "Insufficient stock for " + itemType + " ID: " + itemId +
+                                    ". Required: " + required + ", Available: " + available
+                    );
                 }
 
-                // Save updated batches (cascade should handle it, but safe to save product)
-                productRepository.save(product);
+                // Save updated inventory (Product or MbP)
+                if (parentEntity instanceof ProductEntity) {
+                    productRepository.save((ProductEntity) parentEntity);
+                } else if (parentEntity instanceof MbPEntity) {
+                    mbpRepository.save((MbPEntity) parentEntity);
+                }
+
+                // Create and ADD OrderItemEntity to the collection (cascade will handle saving)
+                OrderItemEntity orderItem = createOrderItemEntity(itemDto, savedEntity, parentEntity);
+                savedEntity.getOrderItems().add(orderItem);
             }
 
-            // After deduction, proceed to create order items...
-            List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
-                    .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
-                    .collect(Collectors.toList());
-            orderItemRepository.saveAll(orderItems);
-            savedEntity.setOrderItems(orderItems);
+            // Save the order entity (cascades to items, populates IDs in collection)
+            savedEntity = orderRepository.save(savedEntity);
+        } else {
+            logger.warn("Order created with no items for userId: {}", orderRequestDto.getUserId());
         }
 
-        logger.info("Order created with ID: {}", savedEntity.getOrderId());
+        logger.info("Order created successfully with ID: {}", savedEntity.getOrderId());
         return mapToResponseDto(savedEntity);
     }
+
+
+//    @Override
+//    public OrderResponseDto createOrder(OrderRequestDto orderRequestDto) {
+//
+//        logger.info("Creating new order");
+//
+//        OrderEntity orderEntity = new OrderEntity();
+//
+//        UserEntity user = userRepository.findById(orderRequestDto.getUserId())
+//                .orElseThrow(() -> new RuntimeException("User not found with ID: " + orderRequestDto.getUserId()));
+//        orderEntity.setUser(user);
+//
+//        orderEntity.setOrderDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a")));
+//        mapOrderFields(orderRequestDto, orderEntity);
+//
+//        OrderEntity savedEntity = orderRepository.save(orderEntity);
+//
+//
+//        // NEW FIX : Deduct product quantities
+//        // Deduct from actual inventory batches (FIFO: oldest batches first)
+//
+//        if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
+//            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
+//                if (itemDto.getQuantity() <= 0) {
+//                    continue;
+//                }
+//
+//                List<InventoryEntity> batches = null;
+//                Object entityToSave = null;
+//
+//                if (itemDto.getProductId() != null) {
+//                    // Existing flow for ProductEntity
+//                    ProductEntity product = productRepository.findById(itemDto.getProductId())
+//                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
+//                    batches = product.getInventoryBatches();
+//                    entityToSave = product;
+//                } else if (itemDto.getMbpId() != null) {
+//                    // New flow for MbPEntity (mirroring ProductEntity)
+//                    MbPEntity mbp = mbpRepository.findById(itemDto.getMbpId())
+//                            .orElseThrow(() -> new RuntimeException("MbP not found with ID: " + itemDto.getMbpId()));
+//                    batches = mbp.getInventoryBatches();
+//                    entityToSave = mbp;
+//                } else {
+//                    continue;  // Skip if neither ID is provided
+//                }
+//
+//                if (batches == null || batches.isEmpty()) {
+//                    throw new RuntimeException("No inventory available for item with ID: " +
+//                            (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()));
+//                }
+//
+//                int required = itemDto.getQuantity();
+//                int remainingToDeduct = required;
+//
+//                // Sort batches by oldest first (FIFO by ID; adjust comparator if needed, e.g., by mfgDate)
+//                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId));
+//
+//                for (InventoryEntity batch : batches) {
+//                    if (remainingToDeduct <= 0) break;
+//
+//                    if (batch.getQuantity() > 0) {
+//                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
+//                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
+//                        remainingToDeduct -= deductFromThisBatch;
+//
+//                        logger.info("Deducted {} from batch {} (item ID: {}). Remaining in batch: {}",
+//                                deductFromThisBatch, batch.getBatchNo(),
+//                                (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()),
+//                                batch.getQuantity());
+//                    }
+//                }
+//
+//                if (remainingToDeduct > 0) {
+//                    throw new RuntimeException("Insufficient inventory for item ID: " +
+//                            (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()) +
+//                            ". Required: " + required + ", Available across batches: " +
+//                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
+//                }
+//
+//                // Save the updated entity (ProductEntity or MbPEntity)
+//                if (entityToSave instanceof ProductEntity) {
+//                    productRepository.save((ProductEntity) entityToSave);
+//                } else if (entityToSave instanceof MbPEntity) {
+//                    mbpRepository.save((MbPEntity) entityToSave);
+//                }
+//            }
+//
+//            // Existing code to create and save order items (unchanged)
+//            List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
+//                    .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
+//                    .collect(Collectors.toList());
+//            orderItemRepository.saveAll(orderItems);
+//            savedEntity.setOrderItems(orderItems);
+//        }
+//
+//
+//        if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
+//            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
+//                if (itemDto.getProductId() == null || itemDto.getQuantity() <= 0) {
+//                    continue;
+//                }
+//
+//                // Fetch product with inventory batches
+//                ProductEntity product = productRepository.findById(itemDto.getProductId())
+//                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
+//
+//                // Load inventory batches (assuming lazy, but since we're in transaction, it's ok)
+//                List<InventoryEntity> batches = product.getInventoryBatches();
+//                if (batches == null || batches.isEmpty()) {
+//                    throw new RuntimeException("No inventory available for product ID: " + itemDto.getProductId());
+//                }
+//
+//                int required = itemDto.getQuantity();
+//                int remainingToDeduct = required;
+//
+//                // Sort batches by oldest first (you can change criteria: mfgDate, inventoryId, etc.)
+//                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId)); // FIFO by ID (or parse mfgDate if needed)
+//
+//                for (InventoryEntity batch : batches) {
+//                    if (remainingToDeduct <= 0) break;
+//
+//                    if (batch.getQuantity() > 0) {
+//                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
+//                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
+//                        remainingToDeduct -= deductFromThisBatch;
+//
+//                        logger.info("Deducted {} from batch {} (product ID: {}). Remaining in batch: {}",
+//                                deductFromThisBatch, batch.getBatchNo(), product.getProductId(), batch.getQuantity());
+//                    }
+//                }
+//
+//                if (remainingToDeduct > 0) {
+//                    throw new RuntimeException("Insufficient inventory for product ID: " + itemDto.getProductId() +
+//                            ". Required: " + required + ", Available across batches: " +
+//                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
+//                }
+//
+//                // Save updated batches (cascade should handle it, but safe to save product)
+//                productRepository.save(product);
+//            }
+//
+//            // After deduction, proceed to create order items...
+//            List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
+//                    .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
+//                    .collect(Collectors.toList());
+//            orderItemRepository.saveAll(orderItems);
+//            savedEntity.setOrderItems(orderItems);
+//        }
+//
+//        logger.info("Order created with ID: {}", savedEntity.getOrderId());
+//        return mapToResponseDto(savedEntity);
+//    }
 
 
     // === ADD THIS METHOD TO OrderServiceImpl.java ===
@@ -166,18 +360,36 @@ public class OrderServiceImpl implements OrderService {
         mapOrderFields(orderRequestDto, orderEntity);
 
         if (orderRequestDto.getOrderItems() != null) {
-            // === FIX: Clear the list first ===
-            orderEntity.getOrderItems().clear();
+            // === Same as in patchOrder ===
+            if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
+                orderItemRepository.deleteAll(orderEntity.getOrderItems());
+                orderEntity.getOrderItems().clear();
+            }
 
-            // Delete old items from DB
-            orderItemRepository.deleteAll(orderEntity.getOrderItems()); // safe: list is now empty
+            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
+                Long productId = itemDto.getProductId();
+                Long mbpId = itemDto.getMbpId();
 
-            // Create new items
-            List<OrderItemEntity> newOrderItems = orderRequestDto.getOrderItems().stream()
-                    .map(itemDto -> createOrderItemEntity(itemDto, orderEntity))
-                    .collect(Collectors.toList());
-            orderItemRepository.saveAll(newOrderItems);
-            orderEntity.getOrderItems().addAll(newOrderItems); // re-populate
+                if ((productId == null && mbpId == null) || (productId != null && mbpId != null)) {
+                    throw new RuntimeException(
+                            "Invalid order item in update: exactly one of 'productId' or 'mbpId' must be provided. " +
+                                    "itemName=" + itemDto.getItemName()
+                    );
+                }
+
+                Object parentEntity = null;
+
+                if (productId != null) {
+                    parentEntity = productRepository.findById(productId)
+                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
+                } else {
+                    parentEntity = mbpRepository.findById(mbpId)
+                            .orElseThrow(() -> new RuntimeException("MbP product not found with ID: " + mbpId));
+                }
+
+                OrderItemEntity newItem = createOrderItemEntity(itemDto, orderEntity, parentEntity);
+                orderEntity.getOrderItems().add(newItem);
+            }
         }
 
         OrderEntity updatedEntity = orderRepository.save(orderEntity);
@@ -223,16 +435,37 @@ public class OrderServiceImpl implements OrderService {
         if (orderRequestDto.getDeliveryDate() != null) orderEntity.setDeliveryDate(orderRequestDto.getDeliveryDate());
 
         if (orderRequestDto.getOrderItems() != null) {
-            if (orderEntity.getOrderItems() != null) {
+            // === Same as in patchOrder ===
+            if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
                 orderItemRepository.deleteAll(orderEntity.getOrderItems());
+                orderEntity.getOrderItems().clear();
             }
-            List<OrderItemEntity> newOrderItems = orderRequestDto.getOrderItems().stream()
-                    .map(itemDto -> createOrderItemEntity(itemDto, orderEntity))
-                    .collect(Collectors.toList());
-            orderItemRepository.saveAll(newOrderItems);
-            orderEntity.setOrderItems(newOrderItems);
-        }
 
+            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
+                Long productId = itemDto.getProductId();
+                Long mbpId = itemDto.getMbpId();
+
+                if ((productId == null && mbpId == null) || (productId != null && mbpId != null)) {
+                    throw new RuntimeException(
+                            "Invalid order item in update: exactly one of 'productId' or 'mbpId' must be provided. " +
+                                    "itemName=" + itemDto.getItemName()
+                    );
+                }
+
+                Object parentEntity = null;
+
+                if (productId != null) {
+                    parentEntity = productRepository.findById(productId)
+                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
+                } else {
+                    parentEntity = mbpRepository.findById(mbpId)
+                            .orElseThrow(() -> new RuntimeException("MbP product not found with ID: " + mbpId));
+                }
+
+                OrderItemEntity newItem = createOrderItemEntity(itemDto, orderEntity, parentEntity);
+                orderEntity.getOrderItems().add(newItem);
+            }
+        }
         OrderEntity updatedEntity = orderRepository.save(orderEntity);
         logger.info("Order patched with ID: {}", updatedEntity.getOrderId());
         return mapToResponseDto(updatedEntity);
@@ -278,32 +511,59 @@ public class OrderServiceImpl implements OrderService {
         orderEntity.setDeliveryDate(requestDto.getDeliveryDate());
     }
 
-    private OrderItemEntity createOrderItemEntity(OrderItemDto itemDto, OrderEntity orderEntity) {
-        OrderItemEntity orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
+//    private OrderItemEntity createOrderItemEntity(OrderItemDto itemDto, OrderEntity orderEntity) {
+//        OrderItemEntity orderItemEntity = new OrderItemEntity();
+//        orderItemEntity.setOrder(orderEntity);
+//
+//        // FIX: Use the values from the DTO instead of fetching from database
+//        // This preserves the prices at the time of order placement
+//        if (itemDto.getProductId() != null) {
+//            ProductEntity product = productRepository.findById(itemDto.getProductId())
+//                    .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
+//            orderItemEntity.setProduct(product);
+//        }
+//
+//        // Always use the values from the request DTO
+//        orderItemEntity.setItemName(itemDto.getItemName());
+//        orderItemEntity.setItemPrice(itemDto.getItemPrice());
+//        orderItemEntity.setItemOldPrice(itemDto.getItemOldPrice());
+//        orderItemEntity.setQuantity(itemDto.getQuantity());
+//        orderItemEntity.setSubtotal(itemDto.getSubtotal());
+//
+//        return orderItemEntity;
+//    }
 
-        // FIX: Use the values from the DTO instead of fetching from database
-        // This preserves the prices at the time of order placement
-        if (itemDto.getProductId() != null) {
-            ProductEntity product = productRepository.findById(itemDto.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
-            orderItemEntity.setProduct(product);
+
+    private OrderItemEntity createOrderItemEntity(OrderItemDto dto, OrderEntity order, Object parentEntity) {
+        OrderItemEntity entity = new OrderItemEntity();
+        entity.setOrder(order);
+        entity.setQuantity(dto.getQuantity());
+        entity.setItemPrice(dto.getItemPrice());
+        entity.setItemOldPrice(dto.getItemOldPrice());
+        entity.setSubtotal(dto.getSubtotal());
+        entity.setItemName(dto.getItemName());
+
+        // Set the correct reference using the passed parentEntity
+        if (parentEntity instanceof ProductEntity) {
+            entity.setProduct((ProductEntity) parentEntity);
+            entity.setMbP(null);
+        } else if (parentEntity instanceof MbPEntity) {
+            entity.setMbP((MbPEntity) parentEntity);
+            entity.setProduct(null);
+        } else {
+            throw new RuntimeException("Invalid parent entity type for order item");
         }
 
-        // Always use the values from the request DTO
-        orderItemEntity.setItemName(itemDto.getItemName());
-        orderItemEntity.setItemPrice(itemDto.getItemPrice());
-        orderItemEntity.setItemOldPrice(itemDto.getItemOldPrice());
-        orderItemEntity.setQuantity(itemDto.getQuantity());
-        orderItemEntity.setSubtotal(itemDto.getSubtotal());
-
-        return orderItemEntity;
+        return entity;
     }
+
 
     private OrderResponseDto mapToResponseDto(OrderEntity orderEntity) {
         OrderResponseDto responseDto = new OrderResponseDto();
+
         responseDto.setOrderId(orderEntity.getOrderId());
         responseDto.setUserId(orderEntity.getUser() != null ? orderEntity.getUser().getUserId() : null);
+
         responseDto.setShippingAddress(orderEntity.getShippingAddress());
         responseDto.setShippingAddress2(orderEntity.getShippingAddress2());
         responseDto.setShippingCity(orderEntity.getShippingCity());
@@ -314,10 +574,12 @@ public class OrderServiceImpl implements OrderService {
         responseDto.setShippingLastName(orderEntity.getShippingLastName());
         responseDto.setShippingEmail(orderEntity.getShippingEmail());
         responseDto.setShippingPhone(orderEntity.getShippingPhone());
+
         responseDto.setCustomerFirstName(orderEntity.getCustomerFirstName());
         responseDto.setCustomerLastName(orderEntity.getCustomerLastName());
         responseDto.setCustomerPhone(orderEntity.getCustomerPhone());
         responseDto.setCustomerEmail(orderEntity.getCustomerEmail());
+
         responseDto.setPaymentMethod(orderEntity.getPaymentMethod());
         responseDto.setTotalAmount(orderEntity.getTotalAmount());
         responseDto.setTax(orderEntity.getTax());
@@ -329,30 +591,104 @@ public class OrderServiceImpl implements OrderService {
         responseDto.setOrderDate(orderEntity.getOrderDate());
         responseDto.setDeliveryDate(orderEntity.getDeliveryDate());
 
-        if (orderEntity.getOrderItems() != null) {
+        // Map Order Items with support for both ProductEntity and MbPEntity
+        if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
             List<OrderItemDto> orderItemDtos = orderEntity.getOrderItems().stream()
                     .map(item -> {
                         OrderItemDto itemDto = new OrderItemDto();
+
                         itemDto.setOrderItemId(item.getOrderItemId());
+
+                        // Set correct IDs
                         itemDto.setProductId(item.getProduct() != null ? item.getProduct().getProductId() : null);
+                        itemDto.setMbpId(item.getMbP() != null ? item.getMbP().getId() : null);
+
                         itemDto.setQuantity(item.getQuantity());
                         itemDto.setItemPrice(item.getItemPrice());
                         itemDto.setItemOldPrice(item.getItemOldPrice());
                         itemDto.setSubtotal(item.getSubtotal());
                         itemDto.setItemName(item.getItemName());
-                        // ADD MAIN IMAGE URL
+
+                        // === MAIN IMAGE URL LOGIC ===
+                        String mainImageUrl = null;
+
                         if (item.getProduct() != null && item.getProduct().getProductId() != null) {
-                            String imageUrl = "/api/products/" + item.getProduct().getProductId() + "/image";
-                            itemDto.setProductMainImage(imageUrl);
+                            // Regular Product - uses /api/products/{id}/image
+                            mainImageUrl = "/api/products/" + item.getProduct().getProductId() + "/image";
+
+                        } else if (item.getMbP() != null && item.getMbP().getId() != null) {
+                            // MbP Product - uses /api/mb/products/{id}/image
+                            mainImageUrl = "/api/mb/products/" + item.getMbP().getId() + "/image";
                         }
+
+                        itemDto.setProductMainImage(mainImageUrl);
+
                         return itemDto;
                     })
                     .collect(Collectors.toList());
+
             responseDto.setOrderItems(orderItemDtos);
+        } else {
+            responseDto.setOrderItems(new ArrayList<>()); // Ensure never null
         }
 
         return responseDto;
     }
+
+
+//    private OrderResponseDto mapToResponseDto(OrderEntity orderEntity) {
+//        OrderResponseDto responseDto = new OrderResponseDto();
+//        responseDto.setOrderId(orderEntity.getOrderId());
+//        responseDto.setUserId(orderEntity.getUser() != null ? orderEntity.getUser().getUserId() : null);
+//        responseDto.setShippingAddress(orderEntity.getShippingAddress());
+//        responseDto.setShippingAddress2(orderEntity.getShippingAddress2());
+//        responseDto.setShippingCity(orderEntity.getShippingCity());
+//        responseDto.setShippingState(orderEntity.getShippingState());
+//        responseDto.setShippingPincode(orderEntity.getShippingPincode());
+//        responseDto.setShippingCountry(orderEntity.getShippingCountry());
+//        responseDto.setShippingFirstName(orderEntity.getShippingFirstName());
+//        responseDto.setShippingLastName(orderEntity.getShippingLastName());
+//        responseDto.setShippingEmail(orderEntity.getShippingEmail());
+//        responseDto.setShippingPhone(orderEntity.getShippingPhone());
+//        responseDto.setCustomerFirstName(orderEntity.getCustomerFirstName());
+//        responseDto.setCustomerLastName(orderEntity.getCustomerLastName());
+//        responseDto.setCustomerPhone(orderEntity.getCustomerPhone());
+//        responseDto.setCustomerEmail(orderEntity.getCustomerEmail());
+//        responseDto.setPaymentMethod(orderEntity.getPaymentMethod());
+//        responseDto.setTotalAmount(orderEntity.getTotalAmount());
+//        responseDto.setTax(orderEntity.getTax());
+//        responseDto.setCouponApplied(orderEntity.getCouponApplied());
+//        responseDto.setConvenienceFee(orderEntity.getConvenienceFee());
+//        responseDto.setDiscountPercent(orderEntity.getDiscountPercent());
+//        responseDto.setDiscountAmount(orderEntity.getDiscountAmount());
+//        responseDto.setOrderStatus(orderEntity.getOrderStatus());
+//        responseDto.setOrderDate(orderEntity.getOrderDate());
+//        responseDto.setDeliveryDate(orderEntity.getDeliveryDate());
+//
+//        if (orderEntity.getOrderItems() != null) {
+//            List<OrderItemDto> orderItemDtos = orderEntity.getOrderItems().stream()
+//                    .map(item -> {
+//                        OrderItemDto itemDto = new OrderItemDto();
+//                        itemDto.setOrderItemId(item.getOrderItemId());
+//                        itemDto.setProductId(item.getProduct() != null ? item.getProduct().getProductId() : null);
+//                        itemDto.setQuantity(item.getQuantity());
+//                        itemDto.setItemPrice(item.getItemPrice());
+//                        itemDto.setItemOldPrice(item.getItemOldPrice());
+//                        itemDto.setSubtotal(item.getSubtotal());
+//                        itemDto.setItemName(item.getItemName());
+//                        // ADD MAIN IMAGE URL
+//                        if (item.getProduct() != null && item.getProduct().getProductId() != null) {
+//                            String imageUrl = "/api/products/" + item.getProduct().getProductId() + "/image";
+//                            itemDto.setProductMainImage(imageUrl);
+//                        }
+//                        return itemDto;
+//                    })
+//                    .collect(Collectors.toList());
+//            responseDto.setOrderItems(orderItemDtos);
+//        }
+//
+//        return responseDto;
+//    }
 
 
     //=============== Cancel Order with Restore Product Quantity ================//

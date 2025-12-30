@@ -14,7 +14,7 @@ public class InventoryEntity {
 
     // Link back to your existing Product
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
+    @JoinColumn(name = "product_id", nullable = true)
     private ProductEntity product;
 
     @Column(name = "batch_no", nullable = false)
@@ -35,6 +35,12 @@ public class InventoryEntity {
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mbp_id", nullable = true)
+    private MbPEntity mbp;
+
+
     @PrePersist
     @PreUpdate
     protected void onUpdate() {
@@ -46,8 +52,8 @@ public class InventoryEntity {
     public InventoryEntity(){}
 
     public InventoryEntity(Long inventoryId, ProductEntity product, String batchNo,
-                           String mfgDate, String expDate, Integer quantity, String stockStatus,
-                           LocalDateTime lastUpdated) {
+                           String mfgDate, String expDate, Integer quantity,
+                           String stockStatus, LocalDateTime lastUpdated, MbPEntity mbp) {
         this.inventoryId = inventoryId;
         this.product = product;
         this.batchNo = batchNo;
@@ -56,6 +62,7 @@ public class InventoryEntity {
         this.quantity = quantity;
         this.stockStatus = stockStatus;
         this.lastUpdated = lastUpdated;
+        this.mbp = mbp;
     }
 
 
@@ -123,5 +130,13 @@ public class InventoryEntity {
 
     public void setLastUpdated(LocalDateTime lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    public MbPEntity getMbp() {
+        return mbp;
+    }
+
+    public void setMbp(MbPEntity mbp) {
+        this.mbp = mbp;
     }
 }

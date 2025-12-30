@@ -4,8 +4,10 @@ import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.BatchWithProductDTO;
 import com.gn.pharmacy.dto.response.ProductAdminResponseDTO;
 import com.gn.pharmacy.entity.InventoryEntity;
+import com.gn.pharmacy.entity.MbPEntity;
 import com.gn.pharmacy.entity.ProductEntity;
 import com.gn.pharmacy.repository.InventoryRepository;
+import com.gn.pharmacy.repository.MbPRepository;
 import com.gn.pharmacy.repository.ProductRepository;
 import com.gn.pharmacy.service.InventoryService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,19 +28,54 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Autowired
     private ProductRepository productRepository;
-    @Autowired private InventoryRepository inventoryRepository;
 
+    @Autowired
+    private MbPRepository mbpRepository;  // Make sure this exists
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
+    // Backward compatibility - only ProductEntity
     @Override
-    public void addStockBatch(Long productId, BatchInfoDTO batchInfo) {
+    public void addStockBatchToProduct(Long productId, BatchInfoDTO batchInfo) {
         ProductEntity product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
 
         InventoryEntity inventory = new InventoryEntity();
         inventory.setProduct(product);
         inventory.setBatchNo(batchInfo.getBatchNo());
         inventory.setQuantity(batchInfo.getQuantity());
-        inventory.setExpDate(batchInfo.getExpiryDate());
         inventory.setMfgDate(batchInfo.getMfgDate());
+        inventory.setExpDate(batchInfo.getExpiryDate());
+
+        inventoryRepository.save(inventory);
+    }
+
+    // Unified add batch - supports both ProductEntity and MbPEntity
+    @Override
+    public void addStockBatch(BatchInfoDTO batchInfo) {
+        if ((batchInfo.getProductId() == null && batchInfo.getMbpId() == null) ||
+                (batchInfo.getProductId() != null && batchInfo.getMbpId() != null)) {
+            throw new IllegalArgumentException("Exactly one of productId or mbpId must be provided.");
+        }
+
+        InventoryEntity inventory = new InventoryEntity();
+
+        if (batchInfo.getProductId() != null) {
+            ProductEntity product = productRepository.findById(batchInfo.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found with ID: " + batchInfo.getProductId()));
+            inventory.setProduct(product);
+        } else {
+            MbPEntity mbp = mbpRepository.findById(batchInfo.getMbpId())
+                    .orElseThrow(() -> new RuntimeException("MbP product not found with ID: " + batchInfo.getMbpId()));
+            inventory.setMbp(mbp);
+        }
+
+        inventory.setBatchNo(batchInfo.getBatchNo());
+        inventory.setQuantity(batchInfo.getQuantity());
+        inventory.setMfgDate(batchInfo.getMfgDate());
+        inventory.setExpDate(batchInfo.getExpiryDate());
+        // stockStatus can be set to default if needed, e.g., "AVAILABLE"
 
         inventoryRepository.save(inventory);
     }
@@ -53,64 +90,62 @@ public class InventoryServiceImpl implements InventoryService {
         ProductAdminResponseDTO response = new ProductAdminResponseDTO();
         response.setProductId(product.getProductId());
         response.setProductName(product.getProductName());
-        response.setSku(product.getSku());                    // Now properly set (was missing?)
+        response.setSku(product.getSku());
         response.setBrandName(product.getBrandName());
 
         List<BatchInfoDTO> batchDTOs = batches.stream()
                 .map(batch -> new BatchInfoDTO(
-                        batch.getInventoryId(),              // Fixed: now includes ID
+                        batch.getInventoryId(),
                         batch.getBatchNo(),
                         batch.getQuantity(),
                         batch.getMfgDate(),
                         batch.getExpDate(),
-                        batch.getStockStatus(),              // Fixed: now includes status
-                        batch.getLastUpdated()               // Fixed: now includes timestamp
+                        batch.getStockStatus(),
+                        batch.getLastUpdated()
                 ))
                 .collect(Collectors.toList());
 
         response.setBatches(batchDTOs);
 
-        // Calculate total stock from actual batch quantities
-        int totalStock = batchDTOs.stream()
-                .mapToInt(BatchInfoDTO::getQuantity)
-                .sum();
+        int totalStock = batchDTOs.stream().mapToInt(BatchInfoDTO::getQuantity).sum();
         response.setTotalStock(totalStock);
 
         return response;
     }
 
     @Override
-    public void updateBatchQuantity(String batchNo, Integer newQuantity) {
-        //implementation
-    }
-
-
-    @Override
-    public Page<BatchWithProductDTO> getAllBatches(int page, int size, Long productId) {
+    public Page<BatchWithProductDTO> getAllBatches(int page, int size, Long productId, Long mbpId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("lastUpdated").descending());
 
         Page<InventoryEntity> inventoryPage;
 
-        if (productId != null) {
-            // Use the new method with JOIN FETCH
-            inventoryPage = inventoryRepository.findByProductIdWithProduct(productId, pageable);
+        if (productId != null && mbpId != null) {
+            throw new IllegalArgumentException("Only one filter (productId or mbpId) can be applied at a time.");
+        } else if (productId != null) {
+            inventoryPage = inventoryRepository.findByProductProductId(productId, pageable);
+        } else if (mbpId != null) {
+            inventoryPage = inventoryRepository.findByMbpId(mbpId, pageable);
         } else {
-            // Use the new method with JOIN FETCH
-            inventoryPage = inventoryRepository.findAllWithProduct(pageable);
+            inventoryPage = inventoryRepository.findAll(pageable);
         }
 
-        // Now all products are already loaded, no N+1 queries
-        // Calculate total stock per product
-        Map<Long, Integer> productTotalStockMap = inventoryPage.getContent()
-                .stream()
+        // Calculate total stock per parent item (product or mbp)
+        Map<Long, Integer> totalStockMap = inventoryPage.getContent().stream()
                 .collect(Collectors.groupingBy(
-                        inv -> inv.getProduct().getProductId(),
+                        inv -> inv.getProduct() != null ? inv.getProduct().getProductId() : inv.getMbp().getId(),
                         Collectors.summingInt(InventoryEntity::getQuantity)
                 ));
 
         return inventoryPage.map(inventory -> {
-            ProductEntity product = inventory.getProduct();
-            Integer totalStock = productTotalStockMap.getOrDefault(product.getProductId(), 0);
+            ProductEntity prod = inventory.getProduct();
+            MbPEntity mbp = inventory.getMbp();
+
+            Long itemId = prod != null ? prod.getProductId() : mbp.getId();
+            String itemName = prod != null ? prod.getProductName() : mbp.getTitle();
+            String sku = prod != null ? prod.getSku() : mbp.getSku();
+            String brandName = prod != null ? prod.getBrandName() : (mbp.getBrand() != null ? mbp.getBrand() : "N/A");
+
+            Integer totalStock = totalStockMap.getOrDefault(itemId, 0);
 
             return new BatchWithProductDTO(
                     inventory.getInventoryId(),
@@ -120,10 +155,10 @@ public class InventoryServiceImpl implements InventoryService {
                     inventory.getExpDate(),
                     inventory.getStockStatus(),
                     inventory.getLastUpdated(),
-                    product.getProductId(),
-                    product.getProductName(),
-                    product.getSku(),
-                    product.getBrandName(),
+                    itemId,
+                    itemName,
+                    sku,
+                    brandName,
                     totalStock
             );
         });
@@ -135,7 +170,6 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryEntity inventory = inventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with ID: " + inventoryId));
 
-        // Update fields only if provided in the request (true PATCH behavior)
         if (batchUpdate.getBatchNo() != null && !batchUpdate.getBatchNo().trim().isEmpty()) {
             inventory.setBatchNo(batchUpdate.getBatchNo().trim());
         }
@@ -152,8 +186,7 @@ public class InventoryServiceImpl implements InventoryService {
             inventory.setStockStatus(batchUpdate.getStockStatus().trim());
         }
 
-        // lastUpdated is automatically updated by @PreUpdate
-        inventoryRepository.save(inventory);
+        inventoryRepository.save(inventory); // lastUpdated auto-updated
     }
 
     @Override
