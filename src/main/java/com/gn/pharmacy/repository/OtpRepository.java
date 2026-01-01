@@ -35,5 +35,4 @@ public interface OtpRepository extends JpaRepository<OtpEntity, Long> {
     @Query("DELETE FROM OtpEntity o WHERE o.email = :email")
     void deleteByEmail(@Param("email") String email);
 
-
 }

@@ -14,7 +14,8 @@ public class BatchWithProductDTO {
 
     // Product details
     // Product / MbP details (we'll use generic names)
-    private Long itemId;                    // productId OR mbpId
+    private Long mbpId;
+    private Long productId;                    // productId OR mbpId
     private String itemName;                // productName or MbP title
     private String sku;                     // same field name in both entities
     private String brandName;              // optional in MbP, can be null
@@ -28,8 +29,8 @@ public class BatchWithProductDTO {
 
     public BatchWithProductDTO(Long inventoryId, String batchNo, Integer quantity,
                                String mfgDate, String expiryDate, String stockStatus,
-                               LocalDateTime lastUpdated, Long itemId, String itemName,
-                               String sku, String brandName, Integer productTotalStock) {
+                               LocalDateTime lastUpdated, Long mbpId, Long productId,
+                               String itemName, String sku, String brandName, Integer productTotalStock) {
         this.inventoryId = inventoryId;
         this.batchNo = batchNo;
         this.quantity = quantity;
@@ -37,19 +38,29 @@ public class BatchWithProductDTO {
         this.expiryDate = expiryDate;
         this.stockStatus = stockStatus;
         this.lastUpdated = lastUpdated;
-        this.itemId = itemId;
+        this.mbpId = mbpId;
+        this.productId = productId;
         this.itemName = itemName;
         this.sku = sku;
         this.brandName = brandName;
         this.productTotalStock = productTotalStock;
     }
 
-    public Long getItemId() {
-        return itemId;
+
+    public Long getMbpId() {
+        return mbpId;
     }
 
-    public void setItemId(Long itemId) {
-        this.itemId = itemId;
+    public void setMbpId(Long mbpId) {
+        this.mbpId = mbpId;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public String getItemName() {

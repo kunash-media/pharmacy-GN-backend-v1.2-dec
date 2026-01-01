@@ -140,10 +140,20 @@ public class InventoryServiceImpl implements InventoryService {
             ProductEntity prod = inventory.getProduct();
             MbPEntity mbp = inventory.getMbp();
 
+            // Defensive check: exactly one of product or mbp should be present
+            if (prod == null && mbp == null) {
+                throw new IllegalStateException("Inventory entity must have either a product or an MBP.");
+            }
+            if (prod != null && mbp != null) {
+                throw new IllegalStateException("Inventory entity cannot have both product and MBP set.");
+            }
+
             Long itemId = prod != null ? prod.getProductId() : mbp.getId();
             String itemName = prod != null ? prod.getProductName() : mbp.getTitle();
             String sku = prod != null ? prod.getSku() : mbp.getSku();
-            String brandName = prod != null ? prod.getBrandName() : (mbp.getBrand() != null ? mbp.getBrand() : "N/A");
+            String brandName = prod != null
+                    ? prod.getBrandName()
+                    : (mbp.getBrand() != null ? mbp.getBrand() : "N/A");
 
             Integer totalStock = totalStockMap.getOrDefault(itemId, 0);
 
@@ -155,7 +165,8 @@ public class InventoryServiceImpl implements InventoryService {
                     inventory.getExpDate(),
                     inventory.getStockStatus(),
                     inventory.getLastUpdated(),
-                    itemId,
+                    prod != null ? prod.getProductId() : null,  // Safe: null if no product
+                    mbp != null ? mbp.getId() : null,          // Safe: null if no mbp
                     itemName,
                     sku,
                     brandName,

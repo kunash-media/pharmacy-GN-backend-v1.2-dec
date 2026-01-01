@@ -91,18 +91,19 @@ public class OtpServiceImpl implements OtpService {
                 .anyMatch(otp -> passwordEncoder.matches(otpVerificationDto.getOtp(), otp.getOtpCode()));
 
         if (otpMatched) {
-            // Find user or admin
-            UserEntity user = userRepository.findByEmail(email);
-            AdminEntity admin = null;
-
-            if (user == null) {
-                admin = adminRepository.findByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("User/Admin not found"));
-            }
-
             // Update password if provided
             if (otpVerificationDto.getNewPassword() != null && !otpVerificationDto.getNewPassword().isEmpty()) {
                 String encodedPassword = passwordEncoder.encode(otpVerificationDto.getNewPassword());
+
+                // Find user or admin
+                UserEntity user = userRepository.findByEmail(email);
+                AdminEntity admin = null;
+
+                if (user == null) {
+                    admin = adminRepository.findByEmail(email)
+                            .orElseThrow(() -> new RuntimeException("User/Admin not found"));
+                }
+
                 if (user != null) {
                     user.setPassword(encodedPassword);
                     userRepository.save(user);
@@ -110,17 +111,38 @@ public class OtpServiceImpl implements OtpService {
                     admin.setPassword(encodedPassword);
                     adminRepository.save(admin);
                 }
+
+                // Mark OTPs as used ONLY after password reset
+                validOtps.forEach(otp -> {
+                    otp.setUsed(true);
+                    otpRepository.save(otp);
+                });
+
+                return true;
+            } else {
+                // If only verifying OTP without password reset, don't mark as used yet
+                return true;
             }
-
-            // Mark OTPs as used
-            validOtps.forEach(otp -> {
-                otp.setUsed(true);
-                otpRepository.save(otp);
-            });
-
-            return true;
         }
 
         return false;
+    }
+
+    @Override
+    @Transactional
+    public boolean validateOtpWithoutMarkingUsed(OtpVerificationDto otpVerificationDto) {
+        // Clean expired OTPs
+        otpRepository.deleteExpiredOtps(LocalDateTime.now());
+
+        String email = otpVerificationDto.getEmail();
+        List<OtpEntity> validOtps = otpRepository.findValidEmailOtps(email, LocalDateTime.now());
+
+        if (validOtps.isEmpty()) {
+            return false;
+        }
+
+        // Check if any OTP matches without marking as used
+        return validOtps.stream()
+                .anyMatch(otp -> passwordEncoder.matches(otpVerificationDto.getOtp(), otp.getOtpCode()));
     }
 }
