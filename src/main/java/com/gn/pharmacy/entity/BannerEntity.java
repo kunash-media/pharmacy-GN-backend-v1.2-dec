@@ -12,7 +12,7 @@ public class BannerEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bannerId;
 
-    @Column(name = "page_name")
+    @Column(unique = true, name = "page_name", nullable = false)
     private String pageName;
 
     @ElementCollection

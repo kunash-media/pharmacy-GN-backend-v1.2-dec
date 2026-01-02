@@ -25,11 +25,24 @@ public class BannerServiceImpl implements BannerService {
     private BannerRepository bannerRepository;
 
     @Override
-    public BannerResponseDto createBanner(BannerRequestDto dto, List<MultipartFile> bannerFileSlides, MultipartFile bannerFileTwo, MultipartFile bannerFileThree, MultipartFile bannerFileFour) throws Exception {
+    public BannerResponseDto createBanner(
+            BannerRequestDto dto,
+            List<MultipartFile> bannerFileSlides,
+            MultipartFile bannerFileTwo,
+            MultipartFile bannerFileThree,
+            MultipartFile bannerFileFour) throws Exception {
+
         logger.info("Creating banner for page: {}", dto.getPageName());
 
+        String pageName = dto.getPageName();
+
+        // Check if a banner with this pageName already exists
+        if (bannerRepository.existsByPageName(pageName)) {
+            throw new RuntimeException("page name existing already! delete existing page");
+        }
+
         BannerEntity entity = new BannerEntity();
-        entity.setPageName(dto.getPageName());
+        entity.setPageName(pageName);
 
         List<byte[]> slidesBytes = new ArrayList<>();
         if (bannerFileSlides != null && !bannerFileSlides.isEmpty()) {

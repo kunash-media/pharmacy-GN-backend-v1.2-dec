@@ -179,9 +179,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponseDto> getProductsByCategory(String category) {
-        logger.debug("Fetching products by category: {}", category);
-        List<ProductEntity> products = productRepository.findByProductCategory(category);
-        logger.debug("Found {} products for category: {}", products.size(), category);
+        logger.debug("Fetching active & approved products by category: {}", category);
+
+        List<ProductEntity> products = productRepository.findByProductCategoryAndActive(category);
+
+        logger.debug("Found {} active & approved products for category: {}", products.size(), category);
+
         return products.stream()
                 .map(this::mapToResponseDto)
                 .collect(Collectors.toList());
@@ -189,9 +192,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponseDto> getProductsBySubCategory(String subCategory) {
-        logger.debug("Fetching products by sub category: {}", subCategory);
-        List<ProductEntity> products = productRepository.findByProductSubCategory(subCategory);
-        logger.debug("Found {} products for sub category: {}", products.size(), subCategory);
+        logger.debug("Fetching active & approved products by sub category: {}", subCategory);
+
+        List<ProductEntity> products = productRepository.findByProductSubCategoryAndActive(subCategory);
+
+        logger.debug("Found {} active & approved products for sub category: {}", products.size(), subCategory);
+
         return products.stream()
                 .map(this::mapToResponseDto)
                 .collect(Collectors.toList());

@@ -41,7 +41,6 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long>,
 
     Optional<ProductEntity> findBySku(String sku);
 
-
     // Override default delete methods to prevent accidental hard deletes
     @Override
     @Modifying
@@ -57,16 +56,43 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long>,
     @Query("SELECT p FROM ProductEntity p WHERE p.productId = ?1 AND p.isDeleted = true")
     Optional<ProductEntity> findDeletedById(Long productId);
 
+    // ==================================================================
+    // UPDATED: Public "active" products = not deleted AND approved = true
+    // ==================================================================
+
+    /**
+     * Returns all products that are:
+     * - Not deleted (isDeleted = false)
+     * - Approved (approved = true)
+     */
+    @Query("SELECT p FROM ProductEntity p WHERE p.isDeleted = false AND p.isApproved = true")
+    List<ProductEntity> findAllActive();
+
+    @Query("SELECT p FROM ProductEntity p WHERE p.isDeleted = false AND p.isApproved = true")
+    Page<ProductEntity> findAllActive(Pageable pageable);
+
+    // Optional: Keep old default methods if other parts use them (but they now use the new logic)
+    // You can remove these defaults if you prefer to always use the @Query versions above
+    /*
     default List<ProductEntity> findAllActive() {
-        return findAll(ProductEntity.notDeleted());
+        return findAll(ProductEntity.notDeletedAndApproved());
     }
 
     default Page<ProductEntity> findAllActive(Pageable pageable) {
-        return findAll(ProductEntity.notDeleted(), pageable);
+        return findAll(ProductEntity.notDeletedAndApproved(), pageable);
     }
+    */
 
-    // New method to fetch non-deleted products by category
+    // New method: non-deleted + approved by category
+    @Query("SELECT p FROM ProductEntity p WHERE p.productCategory = :category AND p.isDeleted = false AND p.isApproved = true")
+    List<ProductEntity> findByProductCategoryAndActive(@Param("category") String category);
+
+    // If you need a version that includes non-approved (for admin), keep this
     @Query("SELECT p FROM ProductEntity p WHERE p.productCategory = :category AND p.isDeleted = false")
     List<ProductEntity> findByProductCategoryAndNotDeleted(@Param("category") String category);
 
+
+    // 4. By SubCategory – only active & approved
+    @Query("SELECT p FROM ProductEntity p WHERE p.productSubCategory = :subCategory AND p.isDeleted = false AND p.isApproved = true")
+    List<ProductEntity> findByProductSubCategoryAndActive(@Param("subCategory") String subCategory);
 }

@@ -11,4 +11,6 @@ public interface BannerRepository extends JpaRepository<BannerEntity, Long> {
 
     Optional<BannerEntity> findByPageName(String pageName);
 
+    boolean existsByPageName(String pageName);
+
 }
