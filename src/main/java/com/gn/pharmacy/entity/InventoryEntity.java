@@ -17,7 +17,7 @@ public class InventoryEntity {
     @JoinColumn(name = "product_id", nullable = true)
     private ProductEntity product;
 
-    @Column(name = "batch_no", nullable = false)
+    @Column(name = "batch_no", nullable = true)
     private String batchNo;
 
     @Column(name = "mfg_date")

@@ -54,8 +54,8 @@ public class ProductEntity {
 
     private LocalDateTime createdAt;
 
-    @Column(name = "product_quantity")
-    private Integer productQuantity;
+//    @Column(name = "product_quantity")
+//    private Integer productQuantity;
 
     @Column(name = "prescription_required")
     private boolean prescriptionRequired;
@@ -63,14 +63,14 @@ public class ProductEntity {
     @Column(name = "brand_name")
     private String brandName;
 
-    @Column(name = "mfg_date")
-    private String mfgDate;
+//    @Column(name = "mfg_date")
+//    private String mfgDate;
 
-    @Column(name = "exp_date")
-    private String expDate;
+//    @Column(name = "exp_date")
+//    private String expDate;
 
-    @Column(name = "batch_no")
-    private String batchNo;
+//    @Column(name = "batch_no")
+//    private String batchNo;
 
     @Column(name = "rating")
     private Double rating;
@@ -147,12 +147,13 @@ public class ProductEntity {
     public ProductEntity(Long productId, String sku, String productName, String productCategory,
                          String productSubCategory, List<BigDecimal> productPrice,
                          List<BigDecimal> productOldPrice, String productStock, String productStatus,
-                         String productDescription, LocalDateTime createdAt, Integer productQuantity,
-                         boolean prescriptionRequired, String brandName, String mfgDate, String expDate,
-                         String batchNo, Double rating, List<String> categoryPath, List<String> benefitsList,
-                         List<String> ingredientsList, List<String> directionsList, byte[] productMainImage,
-                         List<byte[]> productSubImages, Map<String, String> productDynamicFields, List<String> productSizes,
-                         boolean isApproved, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
+                         String productDescription, LocalDateTime createdAt,
+                         boolean prescriptionRequired, String brandName, Double rating,
+                         List<String> categoryPath, List<String> benefitsList,
+                         List<String> ingredientsList, List<String> directionsList,
+                         byte[] productMainImage, List<byte[]> productSubImages,
+                         Map<String, String> productDynamicFields, List<String> productSizes, boolean isApproved, boolean isDeleted, List<InventoryEntity> inventoryBatches) {
+
         this.productId = productId;
         this.sku = sku;
         this.productName = productName;
@@ -164,12 +165,8 @@ public class ProductEntity {
         this.productStatus = productStatus;
         this.productDescription = productDescription;
         this.createdAt = createdAt;
-        this.productQuantity = productQuantity;
         this.prescriptionRequired = prescriptionRequired;
         this.brandName = brandName;
-        this.mfgDate = mfgDate;
-        this.expDate = expDate;
-        this.batchNo = batchNo;
         this.rating = rating;
         this.categoryPath = categoryPath;
         this.benefitsList = benefitsList;
@@ -213,8 +210,7 @@ public class ProductEntity {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public Integer getProductQuantity() { return productQuantity; }
-    public void setProductQuantity(Integer productQuantity) { this.productQuantity = productQuantity; }
+
 
     public boolean isPrescriptionRequired() { return prescriptionRequired; }
     public void setPrescriptionRequired(boolean prescriptionRequired) { this.prescriptionRequired = prescriptionRequired; }
@@ -222,14 +218,6 @@ public class ProductEntity {
     public String getBrandName() { return brandName; }
     public void setBrandName(String brandName) { this.brandName = brandName; }
 
-    public String getMfgDate() { return mfgDate; }
-    public void setMfgDate(String mfgDate) { this.mfgDate = mfgDate; }
-
-    public String getExpDate() { return expDate; }
-    public void setExpDate(String expDate) { this.expDate = expDate; }
-
-    public String getBatchNo() { return batchNo; }
-    public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
 
     public Double getRating() { return rating; }
     public void setRating(Double rating) { this.rating = rating; }

@@ -2,6 +2,8 @@ package com.gn.pharmacy.repository;
 
 import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.entity.InventoryEntity;
+import com.gn.pharmacy.entity.MbPEntity;
+import com.gn.pharmacy.entity.ProductEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface InventoryRepository extends JpaRepository<InventoryEntity, Long> {
@@ -36,5 +39,13 @@ public interface InventoryRepository extends JpaRepository<InventoryEntity, Long
     Page<InventoryEntity> findByMbpId(Long mbpId, Pageable pageable);
 
 
+    // Optional: for performance if you have many batches
+    Optional<InventoryEntity> findFirstByProductOrderByLastUpdatedDesc(ProductEntity product);
+    Optional<InventoryEntity> findFirstByMbpOrderByLastUpdatedDesc(MbPEntity mbp);
+
+
+    List<InventoryEntity> findByProduct(ProductEntity product);
+
+    List<InventoryEntity> findByMbp(MbPEntity mbp);
 
    }

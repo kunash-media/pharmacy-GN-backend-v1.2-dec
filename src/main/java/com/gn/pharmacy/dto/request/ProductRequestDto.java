@@ -31,6 +31,7 @@ public class ProductRequestDto {
     private List<String> categoryPath = new ArrayList<>();
     private MultipartFile productMainImage;
     private List<MultipartFile> productSubImages;
+
     private Map<String, String> productDynamicFields;
     private List<String> productSizes = new ArrayList<>();
 

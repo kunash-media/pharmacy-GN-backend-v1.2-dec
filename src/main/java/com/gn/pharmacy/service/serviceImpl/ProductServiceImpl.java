@@ -1,16 +1,22 @@
 package com.gn.pharmacy.service.serviceImpl;
 
 
+import com.gn.pharmacy.dto.request.ProductPatchDto;
 import com.gn.pharmacy.dto.request.ProductRequestDto;
+import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
+import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.ProductEntity;
+import com.gn.pharmacy.repository.InventoryRepository;
 import com.gn.pharmacy.repository.ProductRepository;
+import com.gn.pharmacy.service.InventoryService;
 import com.gn.pharmacy.service.ProductService;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.poi.ss.usermodel.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,6 +37,12 @@ public class ProductServiceImpl implements ProductService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductServiceImpl.class);
     private final ProductRepository productRepository;
+
+    @Autowired
+    private InventoryService inventoryService;
+
+    @Autowired
+    private InventoryRepository inventoryRepository ;
 
     public ProductServiceImpl(ProductRepository productRepository) {
         this.productRepository = productRepository;
@@ -65,14 +78,14 @@ public class ProductServiceImpl implements ProductService {
         entity.setProductStock(requestDto.getProductStock());
         entity.setProductStatus(requestDto.getProductStatus());
         entity.setProductDescription(requestDto.getProductDescription());
-        entity.setProductQuantity(requestDto.getProductQuantity());
+//        entity.setProductQuantity(requestDto.getProductQuantity());
 
         // Set new fields
         entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
         entity.setBrandName(requestDto.getBrandName());
-        entity.setMfgDate(requestDto.getMfgDate());
-        entity.setExpDate(requestDto.getExpDate());
-        entity.setBatchNo(requestDto.getBatchNo());
+//        entity.setMfgDate(requestDto.getMfgDate());
+//        entity.setExpDate(requestDto.getExpDate());
+//        entity.setBatchNo(requestDto.getBatchNo());
         entity.setRating(requestDto.getRating());
         entity.setBenefitsList(requestDto.getBenefitsList() != null ? requestDto.getBenefitsList() : new ArrayList<>());
         entity.setIngredientsList(requestDto.getIngredientsList() != null ? requestDto.getIngredientsList() : new ArrayList<>());
@@ -125,6 +138,18 @@ public class ProductServiceImpl implements ProductService {
         entity.setCreatedAt(LocalDateTime.now());
 
         ProductEntity savedEntity = productRepository.save(entity);
+
+        // ==============  Automatically add initial inventory batch  =============
+
+        BatchInfoDTO batchInfo = new BatchInfoDTO();
+        batchInfo.setProductId(savedEntity.getProductId());
+        batchInfo.setBatchNo(requestDto.getBatchNo());  // Optional, as per your note
+        batchInfo.setQuantity(requestDto.getProductQuantity());
+        batchInfo.setMfgDate(requestDto.getMfgDate());  // Optional
+        batchInfo.setExpiryDate(requestDto.getExpDate());  // Optional
+        inventoryService.addStockBatch(batchInfo);
+
+
         logger.debug("Product saved with ID: {}", savedEntity.getProductId());
         return mapToResponseDto(savedEntity);
     }
@@ -226,12 +251,12 @@ public class ProductServiceImpl implements ProductService {
         entity.setProductStock(requestDto.getProductStock());
         entity.setProductStatus(requestDto.getProductStatus());
         entity.setProductDescription(requestDto.getProductDescription());
-        entity.setProductQuantity(requestDto.getProductQuantity());
+//        entity.setProductQuantity(requestDto.getProductQuantity());
         entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
         entity.setBrandName(requestDto.getBrandName());
-        entity.setMfgDate(requestDto.getMfgDate());
-        entity.setExpDate(requestDto.getExpDate());
-        entity.setBatchNo(requestDto.getBatchNo());
+//        entity.setMfgDate(requestDto.getMfgDate());
+//        entity.setExpDate(requestDto.getExpDate());
+//        entity.setBatchNo(requestDto.getBatchNo());
         entity.setRating(requestDto.getRating());
 
         if (requestDto.getBenefitsList() != null) {
@@ -289,238 +314,100 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    public ProductResponseDto patchProduct(Long id, ProductRequestDto requestDto) throws Exception {
+    public ProductResponseDto patchProduct(
+            Long id,
+            ProductPatchDto patchDto,
+            MultipartFile productMainImage,
+            List<MultipartFile> productSubImages) throws Exception {
+
         logger.debug("Patching product with ID: {}", id);
 
         ProductEntity entity = productRepository.findById(id)
-                .orElseThrow(() -> {
-                    logger.error("Product not found with ID: {}", id);
-                    return new IllegalArgumentException("Product not found with ID: " + id);
-                });
+                .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
 
-        // Log the approved values
-        logger.debug("Request approved: {}, Current entity approved: {}",
-                requestDto.isApproved(), entity.isApproved());
+        // ==================== PATCH SCALAR FIELDS ====================
+        if (patchDto.getSku() != null) entity.setSku(patchDto.getSku());
+        if (patchDto.getProductName() != null) entity.setProductName(patchDto.getProductName());
+        if (patchDto.getProductCategory() != null) entity.setProductCategory(patchDto.getProductCategory());
+        if (patchDto.getProductSubCategory() != null) {
+            entity.setProductSubCategory(patchDto.getProductSubCategory());
+            entity.setCategoryPath(buildCategoryPath(patchDto.getProductSubCategory()));
+        }
+        if (patchDto.getProductStock() != null) entity.setProductStock(patchDto.getProductStock());
+        if (patchDto.getProductStatus() != null) entity.setProductStatus(patchDto.getProductStatus());
+        if (patchDto.getProductDescription() != null) entity.setProductDescription(patchDto.getProductDescription());
 
-        // ==================== VALIDATION FOR PATCHED FIELDS ====================
-        // Only validate fields that the client is actually trying to update
+//        if (patchDto.getProductQuantity() != null) entity.setProductQuantity(patchDto.getProductQuantity());
+//        if (patchDto.getBrandName() != null) entity.setBrandName(patchDto.getBrandName());
+//        if (patchDto.getMfgDate() != null) entity.setMfgDate(patchDto.getMfgDate());
+//        if (patchDto.getExpDate() != null) entity.setExpDate(patchDto.getExpDate());
+//        if (patchDto.getBatchNo() != null) entity.setBatchNo(patchDto.getBatchNo());
 
-        // Validate price list if being patched
-        if (requestDto.getProductPrice() != null) {
-            if (requestDto.getProductPrice().isEmpty()) {
-                throw new IllegalArgumentException("Product price list cannot be empty when patching");
-            }
-            for (BigDecimal price : requestDto.getProductPrice()) {
-                if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-                    throw new IllegalArgumentException("All patched product prices must be greater than zero");
-                }
-            }
+        if (patchDto.getRating() != null) entity.setRating(patchDto.getRating());
+
+        // Boolean fields - only update if explicitly set
+        if (patchDto.getApproved() != null) {
+            entity.setApproved(patchDto.getApproved());
+        }
+        if (patchDto.getPrescriptionRequired() != null) {
+            entity.setPrescriptionRequired(patchDto.getPrescriptionRequired());
         }
 
-        // Validate quantity if being patched
-        if (requestDto.getProductQuantity() != null && requestDto.getProductQuantity() < 0) {
-            throw new IllegalArgumentException("Patched product quantity cannot be negative");
+        // ==================== PATCH LIST FIELDS (SAFE) ====================
+        // Only update if non-null AND non-empty → prevents accidental clearing
+        if (patchDto.getProductPrice() != null && !patchDto.getProductPrice().isEmpty()) {
+            entity.setProductPrice(patchDto.getProductPrice());
+        }
+        if (patchDto.getProductOldPrice() != null && !patchDto.getProductOldPrice().isEmpty()) {
+            entity.setProductOldPrice(patchDto.getProductOldPrice());
+        }
+        if (patchDto.getProductSizes() != null && !patchDto.getProductSizes().isEmpty()) {
+            entity.setProductSizes(patchDto.getProductSizes());
+        }
+        if (patchDto.getBenefitsList() != null && !patchDto.getBenefitsList().isEmpty()) {
+            entity.setBenefitsList(patchDto.getBenefitsList());
+        }
+        if (patchDto.getIngredientsList() != null && !patchDto.getIngredientsList().isEmpty()) {
+            entity.setIngredientsList(patchDto.getIngredientsList());
+        }
+        if (patchDto.getDirectionsList() != null && !patchDto.getDirectionsList().isEmpty()) {
+            entity.setDirectionsList(patchDto.getDirectionsList());
+        }
+        if (patchDto.getCategoryPath() != null && !patchDto.getCategoryPath().isEmpty()) {
+            entity.setCategoryPath(patchDto.getCategoryPath());
+        }
+        if (patchDto.getProductDynamicFields() != null) {
+            entity.setProductDynamicFields(patchDto.getProductDynamicFields());
         }
 
-        // Validate size-price consistency if sizes or prices or oldPrices are being patched
-        boolean sizesBeingPatched = requestDto.getProductSizes() != null;
-        boolean pricesBeingPatched = requestDto.getProductPrice() != null;
-        boolean oldPricesBeingPatched = requestDto.getProductOldPrice() != null;
-
-        if (sizesBeingPatched || pricesBeingPatched || oldPricesBeingPatched) {
-            // Determine final sizes and prices after this patch
-            List<String> finalSizes = sizesBeingPatched ? requestDto.getProductSizes() : entity.getProductSizes();
-            List<BigDecimal> finalPrices = pricesBeingPatched ? requestDto.getProductPrice() : entity.getProductPrice();
-            List<BigDecimal> finalOldPrices = oldPricesBeingPatched ? requestDto.getProductOldPrice() : entity.getProductOldPrice();
-
-            // If sizes exist (either current or new), prices must match in count
-            if (finalSizes != null && !finalSizes.isEmpty()) {
-                if (finalPrices == null || finalPrices.isEmpty() || finalPrices.size() != finalSizes.size()) {
-                    throw new IllegalArgumentException("Number of prices must match number of sizes after patch");
-                }
-                if (finalOldPrices != null && !finalOldPrices.isEmpty() && finalOldPrices.size() != finalSizes.size()) {
-                    throw new IllegalArgumentException("Number of old prices must match number of sizes after patch");
-                }
-
-                // Optional: ensure old price > current price where both provided
-                if (oldPricesBeingPatched && finalOldPrices != null) {
-                    for (int i = 0; i < finalPrices.size(); i++) {
-                        BigDecimal current = finalPrices.get(i);
-                        BigDecimal old = finalOldPrices.get(i);
-                        if (old != null && old.compareTo(current) <= 0) {
-                            throw new IllegalArgumentException("Old price must be greater than current price for size: " + finalSizes.get(i));
-                        }
-                    }
-                }
-            }
-        }
-        // ==================== END OF VALIDATION ====================
-
-        // ==================== PATCH FIELDS ====================
-
-        // Patch approved field - ALWAYS update if different from current
-        if (requestDto.isApproved() != entity.isApproved()) {
-            logger.debug("Updating approved from {} to {}",
-                    entity.isApproved(), requestDto.isApproved());
-            entity.setApproved(requestDto.isApproved());
+        // ==================== PATCH IMAGES ====================
+        if (productMainImage != null && !productMainImage.isEmpty()) {
+            entity.setProductMainImage(productMainImage.getBytes());
         }
 
-        // Patch only non-null fields
-        if (requestDto.getSku() != null) entity.setSku(requestDto.getSku());
-        if (requestDto.getProductName() != null) entity.setProductName(requestDto.getProductName());
-        if (requestDto.getProductCategory() != null) entity.setProductCategory(requestDto.getProductCategory());
-        if (requestDto.getProductSubCategory() != null) {
-            entity.setProductSubCategory(requestDto.getProductSubCategory());
-            entity.setCategoryPath(buildCategoryPath(requestDto.getProductSubCategory()));
-        }
-        if (requestDto.getProductPrice() != null) entity.setProductPrice(requestDto.getProductPrice());
-        if (requestDto.getProductOldPrice() != null) entity.setProductOldPrice(requestDto.getProductOldPrice());
-        if (requestDto.getProductStock() != null) entity.setProductStock(requestDto.getProductStock());
-        if (requestDto.getProductStatus() != null) entity.setProductStatus(requestDto.getProductStatus());
-        if (requestDto.getProductDescription() != null) entity.setProductDescription(requestDto.getProductDescription());
-        if (requestDto.getProductQuantity() != null) entity.setProductQuantity(requestDto.getProductQuantity());
-
-        // Patch new fields
-        if (requestDto.isPrescriptionRequired() != entity.isPrescriptionRequired()) {
-            entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
-        }
-        if (requestDto.getBrandName() != null) entity.setBrandName(requestDto.getBrandName());
-        if (requestDto.getMfgDate() != null) entity.setMfgDate(requestDto.getMfgDate());
-        if (requestDto.getExpDate() != null) entity.setExpDate(requestDto.getExpDate());
-        if (requestDto.getBatchNo() != null) entity.setBatchNo(requestDto.getBatchNo());
-        if (requestDto.getRating() != null) entity.setRating(requestDto.getRating());
-
-        // For list fields, only update if the request contains a non-empty list
-        if (requestDto.getBenefitsList() != null) {
-            entity.setBenefitsList(requestDto.getBenefitsList());
-        }
-        if (requestDto.getIngredientsList() != null) {
-            entity.setIngredientsList(requestDto.getIngredientsList());
-        }
-        if (requestDto.getDirectionsList() != null) {
-            entity.setDirectionsList(requestDto.getDirectionsList());
-        }
-
-        if (requestDto.getCategoryPath() != null) {
-            entity.setCategoryPath(requestDto.getCategoryPath());
-        }
-
-        // Patch images
-        if (requestDto.getProductMainImage() != null && !requestDto.getProductMainImage().isEmpty()) {
-            entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
-        }
-
-        if (requestDto.getProductSubImages() != null) {
-            List<byte[]> subImages = requestDto.getProductSubImages().stream()
+        if (productSubImages != null && !productSubImages.isEmpty()) {
+            List<byte[]> subImages = productSubImages.stream()
                     .filter(file -> file != null && !file.isEmpty())
                     .map(file -> {
                         try {
                             return file.getBytes();
-                        } catch (Exception e) {
-                            throw new RuntimeException("Failed to process sub image", e);
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to read sub image", e);
                         }
                     })
                     .collect(Collectors.toList());
-            // Even if empty list is provided, update to empty
             entity.setProductSubImages(subImages);
         }
+        // If no images sent → preserve existing ones
 
-        if (requestDto.getProductDynamicFields() != null) {
-            entity.setProductDynamicFields(requestDto.getProductDynamicFields());
-        }
-
-        if (requestDto.getProductSizes() != null) {
-            entity.setProductSizes(requestDto.getProductSizes());
-        }
-        // ==================== END OF PATCH FIELDS ====================
-
+        // Save and return
         ProductEntity updatedEntity = productRepository.save(entity);
-
-        // Verify the update
-        logger.debug("After save - approved: {}", updatedEntity.isApproved());
         logger.debug("Product patched successfully with ID: {}", id);
 
         return mapToResponseDto(updatedEntity);
     }
 
-//    @Override
-//    public ProductResponseDto patchProduct(Long id, ProductRequestDto requestDto) throws Exception {
-//        logger.debug("Patching product with ID: {}", id);
-//
-//        ProductEntity entity = productRepository.findById(id)
-//                .orElseThrow(() -> {
-//                    logger.error("Product not found with ID: {}", id);
-//                    return new IllegalArgumentException("Product not found with ID: " + id);
-//                });
-//
-//
-//        // Patch only non-null fields
-//        if (requestDto.getSku() != null) entity.setSku(requestDto.getSku());
-//        if (requestDto.getProductName() != null) entity.setProductName(requestDto.getProductName());
-//        if (requestDto.getProductCategory() != null) entity.setProductCategory(requestDto.getProductCategory());
-//        if (requestDto.getProductSubCategory() != null) {
-//            entity.setProductSubCategory(requestDto.getProductSubCategory());
-//            entity.setCategoryPath(buildCategoryPath(requestDto.getProductSubCategory()));
-//        }
-//        if (requestDto.getProductPrice() != null) entity.setProductPrice(requestDto.getProductPrice());
-//        if (requestDto.getProductOldPrice() != null) entity.setProductOldPrice(requestDto.getProductOldPrice());
-//        if (requestDto.getProductStock() != null) entity.setProductStock(requestDto.getProductStock());
-//        if (requestDto.getProductStatus() != null) entity.setProductStatus(requestDto.getProductStatus());
-//        if (requestDto.getProductDescription() != null) entity.setProductDescription(requestDto.getProductDescription());
-//        if (requestDto.getProductQuantity() != null) entity.setProductQuantity(requestDto.getProductQuantity());
-//
-//        // Patch new fields
-//        if (requestDto.isPrescriptionRequired() != entity.isPrescriptionRequired()) {
-//            entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
-//        }
-//        if (requestDto.getBrandName() != null) entity.setBrandName(requestDto.getBrandName());
-//        if (requestDto.getMfgDate() != null) entity.setMfgDate(requestDto.getMfgDate());
-//        if (requestDto.getExpDate() != null) entity.setExpDate(requestDto.getExpDate());
-//        if (requestDto.getBatchNo() != null) entity.setBatchNo(requestDto.getBatchNo());
-//        if (requestDto.getRating() != null) entity.setRating(requestDto.getRating());
-//        if (requestDto.getBenefitsList() != null && !requestDto.getBenefitsList().isEmpty()) {
-//            entity.setBenefitsList(requestDto.getBenefitsList());
-//        }
-//        if (requestDto.getIngredientsList() != null && !requestDto.getIngredientsList().isEmpty()) {
-//            entity.setIngredientsList(requestDto.getIngredientsList());
-//        }
-//        if (requestDto.getDirectionsList() != null && !requestDto.getDirectionsList().isEmpty()) {
-//            entity.setDirectionsList(requestDto.getDirectionsList());
-//        }
-//        if (requestDto.getCategoryPath() != null && !requestDto.getCategoryPath().isEmpty()) {
-//            entity.setCategoryPath(requestDto.getCategoryPath());
-//        }
-//
-//        // Patch images
-//        if (requestDto.getProductMainImage() != null && !requestDto.getProductMainImage().isEmpty()) {
-//            entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
-//        }
-//        if (requestDto.getProductSubImages() != null) {
-//            List<byte[]> subImages = requestDto.getProductSubImages().stream()
-//                    .filter(file -> file != null && !file.isEmpty())
-//                    .map(file -> {
-//                        try {
-//                            return file.getBytes();
-//                        } catch (Exception e) {
-//                            throw new RuntimeException("Failed to process sub image", e);
-//                        }
-//                    })
-//                    .collect(Collectors.toList());
-//            if (!subImages.isEmpty()) {
-//                entity.setProductSubImages(subImages);
-//            }
-//        }
-//        if (requestDto.getProductDynamicFields() != null) {
-//            entity.setProductDynamicFields(requestDto.getProductDynamicFields());
-//        }
-//        if (requestDto.getProductSizes() != null) {
-//            entity.setProductSizes(requestDto.getProductSizes());
-//        }
-//
-//        ProductEntity updatedEntity = productRepository.save(entity);
-//        logger.debug("Product patched successfully with ID: {}", id);
-//        return mapToResponseDto(updatedEntity);
-//    }
+
 
 
     // NEW VALIDATION ADDED METHOD
@@ -925,51 +812,122 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
-    private ProductResponseDto mapToResponseDto(ProductEntity entity) {
-        ProductResponseDto responseDto = new ProductResponseDto();
+//    private ProductResponseDto mapToResponseDto(ProductEntity entity) {
+//        ProductResponseDto responseDto = new ProductResponseDto();
+//
+//        responseDto.setApproved(entity.isApproved());
+//        responseDto.setDeleted(entity.isDeleted());
+//        responseDto.setProductId(entity.getProductId());
+//        responseDto.setSku(entity.getSku());
+//        responseDto.setProductName(entity.getProductName());
+//        responseDto.setProductCategory(entity.getProductCategory());
+//        responseDto.setProductSubCategory(entity.getProductSubCategory());
+//        responseDto.setProductPrice(entity.getProductPrice());
+//        responseDto.setProductOldPrice(entity.getProductOldPrice());
+//        responseDto.setProductStock(entity.getProductStock());
+//        responseDto.setProductStatus(entity.getProductStatus());
+//        responseDto.setProductDescription(entity.getProductDescription());
+//        responseDto.setCreatedAt(entity.getCreatedAt());
+////        responseDto.setProductQuantity(entity.getProductQuantity());
+//        responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
+//        responseDto.setBrandName(entity.getBrandName());
+////        responseDto.setMfgDate(entity.getMfgDate());
+////        responseDto.setExpDate(entity.getExpDate());
+////        responseDto.setBatchNo(entity.getBatchNo());
+//        responseDto.setRating(entity.getRating());
+//        responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
+//        responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
+//        responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
+//        responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
+//
+//        // Set image URLs
+//        if (entity.getProductMainImage() != null) {
+//            responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
+//        }
+//
+//        if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
+//            List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
+//                    .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
+//                    .collect(Collectors.toList());
+//            responseDto.setProductSubImages(subImageUrls);
+//        }
+//
+//        responseDto.setProductDynamicFields(entity.getProductDynamicFields());
+//        responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
+//
+//        return responseDto;
+//    }
 
-        responseDto.setApproved(entity.isApproved());
-        responseDto.setDeleted(entity.isDeleted());
-        responseDto.setProductId(entity.getProductId());
-        responseDto.setSku(entity.getSku());
-        responseDto.setProductName(entity.getProductName());
-        responseDto.setProductCategory(entity.getProductCategory());
-        responseDto.setProductSubCategory(entity.getProductSubCategory());
-        responseDto.setProductPrice(entity.getProductPrice());
-        responseDto.setProductOldPrice(entity.getProductOldPrice());
-        responseDto.setProductStock(entity.getProductStock());
-        responseDto.setProductStatus(entity.getProductStatus());
-        responseDto.setProductDescription(entity.getProductDescription());
-        responseDto.setCreatedAt(entity.getCreatedAt());
-        responseDto.setProductQuantity(entity.getProductQuantity());
-        responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
-        responseDto.setBrandName(entity.getBrandName());
-        responseDto.setMfgDate(entity.getMfgDate());
-        responseDto.setExpDate(entity.getExpDate());
-        responseDto.setBatchNo(entity.getBatchNo());
-        responseDto.setRating(entity.getRating());
-        responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
-        responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
-        responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
-        responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
 
-        // Set image URLs
-        if (entity.getProductMainImage() != null) {
-            responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
-        }
+private ProductResponseDto mapToResponseDto(ProductEntity entity) {
+    ProductResponseDto responseDto = new ProductResponseDto();
 
-        if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
-            List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
-                    .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
-                    .collect(Collectors.toList());
-            responseDto.setProductSubImages(subImageUrls);
-        }
+    responseDto.setApproved(entity.isApproved());
+    responseDto.setDeleted(entity.isDeleted());
+    responseDto.setProductId(entity.getProductId());
+    responseDto.setSku(entity.getSku());
+    responseDto.setProductName(entity.getProductName());
+    responseDto.setProductCategory(entity.getProductCategory());
+    responseDto.setProductSubCategory(entity.getProductSubCategory());
+    responseDto.setProductPrice(entity.getProductPrice());
+    responseDto.setProductOldPrice(entity.getProductOldPrice());
+    responseDto.setProductStock(entity.getProductStock());
+    responseDto.setProductStatus(entity.getProductStatus());
+    responseDto.setProductDescription(entity.getProductDescription());
+    responseDto.setCreatedAt(entity.getCreatedAt());
+    responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
+    responseDto.setBrandName(entity.getBrandName());
+    responseDto.setRating(entity.getRating());
+    responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
+    responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
+    responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
+    responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
 
-        responseDto.setProductDynamicFields(entity.getProductDynamicFields());
-        responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
-
-        return responseDto;
+    // Set image URLs
+    if (entity.getProductMainImage() != null) {
+        responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
     }
+
+    if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
+        List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
+                .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
+                .collect(Collectors.toList());
+        responseDto.setProductSubImages(subImageUrls);
+    }
+
+    responseDto.setProductDynamicFields(entity.getProductDynamicFields());
+    responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
+
+    // ==================== ADD THIS BLOCK HERE ====================
+    // Fetch total quantity from all batches
+    List<InventoryEntity> inventories = inventoryRepository.findByProduct(entity);
+
+    if (!inventories.isEmpty()) {
+        int totalQuantity = inventories.stream()
+                .mapToInt(InventoryEntity::getQuantity)
+                .sum();
+        responseDto.setProductQuantity(totalQuantity);
+
+        // Fetch only the latest batch for batchNo, mfgDate, expDate (optimized)
+        Optional<InventoryEntity> latestOpt = inventoryRepository
+                .findFirstByProductOrderByLastUpdatedDesc(entity);
+
+        latestOpt.ifPresent(latest -> {
+            responseDto.setBatchNo(latest.getBatchNo());
+            responseDto.setMfgDate(latest.getMfgDate());
+            responseDto.setExpDate(latest.getExpDate());
+        });
+    } else {
+        // No inventory yet
+        responseDto.setProductQuantity(0);
+        responseDto.setBatchNo(null);
+        responseDto.setMfgDate(null);
+        responseDto.setExpDate(null);
+    }
+    // ===========================================================
+
+    return responseDto;
+}
 
 
 }

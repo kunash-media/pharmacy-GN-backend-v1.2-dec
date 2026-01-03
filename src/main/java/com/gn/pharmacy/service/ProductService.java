@@ -1,5 +1,6 @@
 package com.gn.pharmacy.service;
 
+import com.gn.pharmacy.dto.request.ProductPatchDto;
 import com.gn.pharmacy.dto.request.ProductRequestDto;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
@@ -23,7 +24,11 @@ public interface ProductService {
 
     ProductResponseDto updateProduct(Long id, ProductRequestDto requestDto) throws Exception;
 
-    ProductResponseDto patchProduct(Long id, ProductRequestDto requestDto) throws Exception;
+    public ProductResponseDto patchProduct(
+            Long id,
+            ProductPatchDto patchDto,
+            MultipartFile productMainImage,
+            List<MultipartFile> productSubImages) throws Exception;
 
     void deleteProduct(Long productId);
 

@@ -1,11 +1,15 @@
 package com.gn.pharmacy.service.serviceImpl;
 
 import com.gn.pharmacy.dto.request.MbPRequestDto;
+import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.MbPResponseDto;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
+import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.MbPEntity;
 import com.gn.pharmacy.entity.ProductEntity;
+import com.gn.pharmacy.repository.InventoryRepository;
 import com.gn.pharmacy.repository.MbPRepository;
+import com.gn.pharmacy.service.InventoryService;
 import com.gn.pharmacy.service.MbPService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,9 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -27,8 +29,13 @@ public class MbPServiceImpl implements MbPService {
 
     private static final Logger logger = LoggerFactory.getLogger(MbPServiceImpl.class);
 
+    @Autowired private InventoryService inventoryService;
+
     @Autowired
     private MbPRepository repo;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
 
     @Override
     public MbPResponseDto createMbProduct(MbPRequestDto dto) {
@@ -42,6 +49,14 @@ public class MbPServiceImpl implements MbPService {
 
             MbPEntity entity = toEntity(dto, new MbPEntity());
             entity = repo.save(entity);
+
+            BatchInfoDTO batchInfo = new BatchInfoDTO();
+            batchInfo.setMbpId(entity.getId());
+            batchInfo.setBatchNo("MB-DEFAULT-" + entity.getId());  // Optional/default if not in DTO
+            batchInfo.setQuantity(dto.getStockQuantity());
+            batchInfo.setMfgDate(null);  // Optional, add to DTO if needed
+            batchInfo.setExpiryDate(null);  // Optional, add to DTO if needed
+            inventoryService.addStockBatch(batchInfo);
 
             MbPResponseDto response = toDto(entity);
             logger.info("MB Product created successfully with ID: {}, SKU: {}", response.getId(), response.getSku());
@@ -388,6 +403,44 @@ public class MbPServiceImpl implements MbPService {
         }
     }
 
+//    @Override
+//    public MbPResponseDto toDto(MbPEntity e) {
+//        logger.debug("Converting Entity to DTO for MB product ID: {}", e.getId());
+//
+//        MbPResponseDto d = new MbPResponseDto();
+//        d.setId(e.getId());
+//        d.setSku(e.getSku());
+//        d.setTitle(e.getTitle());
+//        d.setCategory(e.getCategory());
+//        d.setSubCategory(e.getSubCategory());
+//        d.setPrice(e.getPrice());
+//        d.setOriginalPrice(e.getOriginalPrice());
+//        d.setDiscount(e.getDiscount());
+//        d.setRating(e.getRating());
+//        d.setReviewCount(e.getReviewCount());
+//        d.setBrand(e.getBrand());
+//        d.setInStock(e.getInStock());
+//        d.setStockQuantity(e.getStockQuantity());
+//        d.setDescription(e.getDescription());
+//        d.setProductSizes(e.getProductSizes());
+//        d.setFeatures(e.getFeatures());
+//        d.setSpecifications(e.getSpecifications());
+//        d.setCreatedAt(e.getCreatedAt());
+//
+//        Long id = e.getId();
+//        d.setMainImageUrl("/api/mb/products/" + id + "/image");
+//
+//        List<String> subUrls = IntStream.range(0, e.getProductSubImages().size())
+//                .mapToObj(i -> "/api/mb/products/" + id + "/subimage/" + i)
+//                .collect(Collectors.toList());
+//        d.setSubImageUrls(subUrls);
+//
+//        logger.debug("DTO conversion completed for MB product ID: {}", e.getId());
+//
+//        return d;
+//    }
+
+
     @Override
     public MbPResponseDto toDto(MbPEntity e) {
         logger.debug("Converting Entity to DTO for MB product ID: {}", e.getId());
@@ -404,8 +457,7 @@ public class MbPServiceImpl implements MbPService {
         d.setRating(e.getRating());
         d.setReviewCount(e.getReviewCount());
         d.setBrand(e.getBrand());
-        d.setInStock(e.getInStock());
-        d.setStockQuantity(e.getStockQuantity());
+        d.setInStock(e.getInStock());  // This can stay as-is (boolean based on your business rule, e.g., total > 0)
         d.setDescription(e.getDescription());
         d.setProductSizes(e.getProductSizes());
         d.setFeatures(e.getFeatures());
@@ -420,8 +472,37 @@ public class MbPServiceImpl implements MbPService {
                 .collect(Collectors.toList());
         d.setSubImageUrls(subUrls);
 
-        logger.debug("DTO conversion completed for MB product ID: {}", e.getId());
+        // ==================== INVENTORY MAPPING BLOCK ====================
+        List<InventoryEntity> inventories = inventoryRepository.findByMbp(e);
 
+        if (!inventories.isEmpty()) {
+            // Total stock quantity across all batches
+            int totalQuantity = inventories.stream()
+                    .mapToInt(InventoryEntity::getQuantity)
+                    .sum();
+            d.setStockQuantity(totalQuantity);
+
+            // Optional: Get latest batch details (uncomment if your MbPResponseDto has these fields)
+            Optional<InventoryEntity> latestOpt = inventoryRepository
+                    .findFirstByMbpOrderByLastUpdatedDesc(e);
+
+            latestOpt.ifPresent(latest -> {
+                // Uncomment these lines only if you have added these fields to MbPResponseDto
+                // d.setBatchNo(latest.getBatchNo());
+                // d.setMfgDate(latest.getMfgDate());
+                // d.setExpDate(latest.getExpDate());
+            });
+        } else {
+            // No inventory yet
+            d.setStockQuantity(0);
+            // If you have batch fields in DTO, set them to null here
+            // d.setBatchNo(null);
+            // d.setMfgDate(null);
+            // d.setExpDate(null);
+        }
+        // ================================================================
+
+        logger.debug("DTO conversion completed for MB product ID: {}", e.getId());
         return d;
     }
 }

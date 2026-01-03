@@ -1,6 +1,7 @@
 package com.gn.pharmacy.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gn.pharmacy.dto.request.ProductPatchDto;
 import com.gn.pharmacy.dto.request.ProductRequestDto;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
@@ -223,23 +224,19 @@ public class ProductController {
         logger.info("Partially updating product with ID: {}", productId);
 
         try {
-            ProductRequestDto requestDto = new ProductRequestDto();
+            // Create empty patch DTO
+            ProductPatchDto patchDto = new ProductPatchDto();
 
-            if (productDataJson != null && !productDataJson.isEmpty()) {
-                requestDto = objectMapper.readValue(productDataJson, ProductRequestDto.class);
+            // Only deserialize if JSON part is provided and not empty
+            if (productDataJson != null && !productDataJson.trim().isEmpty()) {
+                patchDto = objectMapper.readValue(productDataJson, ProductPatchDto.class);
             }
 
-            // Set images if provided
-            if (productMainImage != null && !productMainImage.isEmpty()) {
-                requestDto.setProductMainImage(productMainImage);
-            }
-            if (productSubImages != null && !productSubImages.isEmpty()) {
-                requestDto.setProductSubImages(productSubImages);
-            }
+            // Call service with clean separation
+            ProductResponseDto updatedProduct = productService.patchProduct(
+                    productId, patchDto, productMainImage, productSubImages);
 
-            ProductResponseDto updatedProduct = productService.patchProduct(productId, requestDto);
             logger.info("Product patched successfully: {}", updatedProduct.getProductName());
-
             return ResponseEntity.ok(updatedProduct);
 
         } catch (IllegalArgumentException e) {
@@ -250,6 +247,8 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+
 
     @DeleteMapping("/delete-product/{productId}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long productId) {
@@ -495,12 +494,12 @@ public class ProductController {
         responseDto.setProductStatus(entity.getProductStatus());
         responseDto.setProductDescription(entity.getProductDescription());
         responseDto.setCreatedAt(entity.getCreatedAt());
-        responseDto.setProductQuantity(entity.getProductQuantity());
+//        responseDto.setProductQuantity(entity.getProductQuantity());
         responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
-        responseDto.setBrandName(entity.getBrandName());
-        responseDto.setMfgDate(entity.getMfgDate());
-        responseDto.setExpDate(entity.getExpDate());
-        responseDto.setBatchNo(entity.getBatchNo());
+//        responseDto.setBrandName(entity.getBrandName());
+//        responseDto.setMfgDate(entity.getMfgDate());
+//        responseDto.setExpDate(entity.getExpDate());
+//        responseDto.setBatchNo(entity.getBatchNo());
         responseDto.setRating(entity.getRating());
         responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new java.util.ArrayList<>());
         responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new java.util.ArrayList<>());
