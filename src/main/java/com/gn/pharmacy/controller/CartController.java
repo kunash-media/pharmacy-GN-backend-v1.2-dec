@@ -459,6 +459,26 @@ public class CartController {
         }
     }
 
+    /**
+     * GET /api/cart/cart-count-by-userId/{userId}
+     * Returns ONLY the count number (plain text / number)
+     * Example: 3
+     */
+    @GetMapping(value = "/cart-count-by-userId/{userId}", produces = "text/plain")
+    public ResponseEntity<String> getCartCountByUserId(@PathVariable Long userId) {
+
+        if (userId == null || userId <= 0) {
+            return ResponseEntity.ok("0");
+        }
+
+        try {
+            long count = cartItemRepository.countByUserUserId(userId);
+            return ResponseEntity.ok(String.valueOf(count));
+        } catch (Exception e) {
+            return ResponseEntity.ok("0");
+        }
+    }
+
     private List<String> getSubImageUrls(Long id, int count) {
         return java.util.stream.IntStream.range(0, count)
                 .mapToObj(i -> "/api/products/" + id + "/subimage/" + i)
