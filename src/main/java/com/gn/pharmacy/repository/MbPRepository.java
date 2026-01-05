@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
-   JpaSpecificationExecutor<MbPEntity>{
+        JpaSpecificationExecutor<MbPEntity>{
 
     Optional<MbPEntity> findBySku(String sku);
     boolean existsBySku(String sku);
@@ -46,6 +46,12 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
     List<MbPEntity> findByCategoryOrderByTitleAsc(String category);
 
 
+    List<MbPEntity> findByApprovedTrue();
+    List<MbPEntity> findByApprovedFalse();
+    List<MbPEntity> findByCategoryAndApprovedTrue(String category);
+    List<MbPEntity> findByCategoryAndApprovedFalse(String category);
+    long countByApprovedTrue();
+    long countByApprovedFalse();
 
     // Override default delete methods to prevent accidental hard deletes
     @Override

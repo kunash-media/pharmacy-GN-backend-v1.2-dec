@@ -26,6 +26,9 @@ public class MbPRequestDto {
     private List<MultipartFile> subImages = new ArrayList<>();
     private String specifications;
 
+
+    private Boolean approved;
+
     // Getters and Setters
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
@@ -96,4 +99,13 @@ public class MbPRequestDto {
 
     public String getSpecifications() { return specifications; }
     public void setSpecifications(String specifications) { this.specifications = specifications; }
+
+
+    public Boolean getApproved() {
+        return approved;
+    }
+
+    public void setApproved(Boolean approved) {
+        this.approved = approved;
+    }
 }

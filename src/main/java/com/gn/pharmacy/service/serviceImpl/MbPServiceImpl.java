@@ -352,12 +352,19 @@ public class MbPServiceImpl implements MbPService {
                 }
                 logger.debug("{} sub-images set for MB product", d.getSubImages().size());
             }
+
+            // NEW: Set approved field if provided in request (null = keep existing/default)
+            if (d.getApproved() != null) {
+                e.setApproved(d.getApproved());
+            }
         } catch (Exception ex) {
             logger.error("Error processing images for MB product: {}", ex.getMessage(), ex);
             throw new RuntimeException("Error processing images", ex);
         }
         return e;
     }
+
+
 
     private void patchEntity(MbPRequestDto d, MbPEntity e) {
         logger.debug("Patching MB entity with partial data");
@@ -379,6 +386,10 @@ public class MbPServiceImpl implements MbPService {
         if (d.getFeatures() != null && !d.getFeatures().isEmpty()) e.setFeatures(d.getFeatures());
         if (StringUtils.hasText(d.getSpecifications())) e.setSpecifications(d.getSpecifications());
 
+        // NEW: Patch approved field if provided
+        if (d.getApproved() != null) {
+            e.setApproved(d.getApproved());
+        }
         if (d.getMainImage() != null && !d.getMainImage().isEmpty()) {
             try {
                 e.setProductMainImage(d.getMainImage().getBytes());
@@ -463,6 +474,7 @@ public class MbPServiceImpl implements MbPService {
         d.setFeatures(e.getFeatures());
         d.setSpecifications(e.getSpecifications());
         d.setCreatedAt(e.getCreatedAt());
+        d.setApproved(e.isApproved());
 
         Long id = e.getId();
         d.setMainImageUrl("/api/mb/products/" + id + "/image");

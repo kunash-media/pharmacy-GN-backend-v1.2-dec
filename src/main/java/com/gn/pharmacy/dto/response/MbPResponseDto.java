@@ -31,6 +31,9 @@ public class MbPResponseDto {
     private String mainImageUrl;
     private List<String> subImageUrls = new ArrayList<>();
 
+
+    private Boolean approved;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -108,4 +111,12 @@ public class MbPResponseDto {
 
     public List<String> getSubImageUrls() { return subImageUrls; }
     public void setSubImageUrls(List<String> subImageUrls) { this.subImageUrls = subImageUrls; }
+
+    public Boolean getApproved() {
+        return approved;
+    }
+
+    public void setApproved(Boolean approved) {
+        this.approved = approved;
+    }
 }

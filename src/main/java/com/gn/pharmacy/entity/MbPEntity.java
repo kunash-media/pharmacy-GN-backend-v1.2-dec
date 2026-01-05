@@ -83,6 +83,10 @@ public class MbPEntity {
     }
 
 
+    // NEW: Add approved field with default false (0)
+    @Column(name = "is_approved", nullable = false, columnDefinition = "boolean default false")
+    private boolean approved = false;
+
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private boolean isDeleted = false;
 
@@ -189,5 +193,13 @@ public class MbPEntity {
 
     public void setInventoryBatches(List<InventoryEntity> inventoryBatches) {
         this.inventoryBatches = inventoryBatches;
+    }
+
+    public boolean isApproved() {
+        return approved;
+    }
+
+    public void setApproved(boolean approved) {
+        this.approved = approved;
     }
 }
