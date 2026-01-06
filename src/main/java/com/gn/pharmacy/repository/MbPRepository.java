@@ -19,7 +19,8 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
 
     Optional<MbPEntity> findBySku(String sku);
     boolean existsBySku(String sku);
-    List<MbPEntity> findByCategory(String category);
+
+//    List<MbPEntity> findByCategory(String category);
     List<MbPEntity> findBySubCategory(String subCategory);
     List<MbPEntity> findByTitleContainingIgnoreCase(String keyword);
     List<MbPEntity> findBySkuContainingIgnoreCase(String keyword);
@@ -78,6 +79,6 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
 
     // New method to fetch non-deleted products by category
     @Query("SELECT p FROM MbPEntity p WHERE p.category = :category AND p.isDeleted = false")
-    List<ProductEntity> findByProductCategoryAndNotDeleted(@Param("category") String category);
+    List<MbPEntity> findByProductCategoryAndNotDeleted(@Param("category") String category);
 
 }

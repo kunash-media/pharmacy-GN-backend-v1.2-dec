@@ -95,6 +95,13 @@ public class MbPEntity {
     @OneToMany(mappedBy = "mbp", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<InventoryEntity> inventoryBatches = new ArrayList<>();
 
+    // Helper method to get total quantity from all batches (mirrors ProductEntity)
+    public Integer getTotalCalculatedStock() {
+        return inventoryBatches.stream()
+                .mapToInt(InventoryEntity::getQuantity)
+                .sum();
+    }
+
     //NEW DELETED PRODUCT
     public static Specification<MbPEntity> notDeleted() {
         return (root, query, cb) -> cb.equal(root.get("isDeleted"), false);

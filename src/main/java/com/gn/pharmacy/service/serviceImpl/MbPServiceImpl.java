@@ -226,7 +226,7 @@ public class MbPServiceImpl implements MbPService {
         logger.info("Fetching MB products by category: {}", category);
 
         try {
-            List<MbPResponseDto> products = repo.findByCategory(category).stream()
+            List<MbPResponseDto> products = repo.findByProductCategoryAndNotDeleted(category).stream()
                     .map(this::toDto)
                     .collect(Collectors.toList());
 

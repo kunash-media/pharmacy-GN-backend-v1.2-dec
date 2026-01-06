@@ -54,23 +54,11 @@ public class ProductEntity {
 
     private LocalDateTime createdAt;
 
-//    @Column(name = "product_quantity")
-//    private Integer productQuantity;
-
     @Column(name = "prescription_required")
     private boolean prescriptionRequired;
 
     @Column(name = "brand_name")
     private String brandName;
-
-//    @Column(name = "mfg_date")
-//    private String mfgDate;
-
-//    @Column(name = "exp_date")
-//    private String expDate;
-
-//    @Column(name = "batch_no")
-//    private String batchNo;
 
     @Column(name = "rating")
     private Double rating;
