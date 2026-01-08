@@ -499,13 +499,15 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+
+
     //=================== bulk product handling api ======================//
 
     @Override
     public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
         logger.debug("Starting bulk product creation from Excel");
 
-        // Image mapping with extension stripping
+        // ================= 1. MAP IMAGES =================
         Map<String, MultipartFile> imageMap = new HashMap<>();
         if (images != null) {
             for (MultipartFile image : images) {
@@ -530,18 +532,15 @@ public class ProductServiceImpl implements ProductService {
             Iterator<Row> rowIterator = sheet.iterator();
 
             // Skip header row
-            if (rowIterator.hasNext()) {
-                rowIterator.next();
-            }
+            if (rowIterator.hasNext()) rowIterator.next();
 
             while (rowIterator.hasNext()) {
                 Row row = rowIterator.next();
-                String productName = getCellValue(row.getCell(0)).trim();
 
-                // Validate product name
+                String productName = getCellValue(row.getCell(0)).trim();
                 if (productName.isEmpty()) {
                     skippedCount++;
-                    skippedReasons.add("Empty or missing product name in row " + (row.getRowNum() + 1));
+                    skippedReasons.add("Empty product name at row " + (row.getRowNum() + 1));
                     continue;
                 }
 
@@ -552,187 +551,225 @@ public class ProductServiceImpl implements ProductService {
                 }
 
                 ProductRequestDto dto = new ProductRequestDto();
+
+                // ================= 2. BASIC FIELDS =================
                 dto.setProductName(productName);
                 dto.setProductCategory(getCellValue(row.getCell(1)));
                 dto.setProductSubCategory(getCellValue(row.getCell(2)));
+                dto.setSku(getCellValue(row.getCell(21)));
 
-                // === Current Price (Column 3) - REQUIRED ===
+                // ================= 3. PRICES =================
+                List<BigDecimal> prices = new ArrayList<>();
                 String priceStr = getCellValue(row.getCell(3)).trim();
                 if (priceStr.isEmpty()) {
                     skippedCount++;
-                    skippedReasons.add("Missing or empty price for product: " + productName);
+                    skippedReasons.add("Missing price for product: " + productName);
                     continue;
                 }
                 try {
-                    BigDecimal currentPrice = new BigDecimal(priceStr);
-                    dto.setProductPrice(List.of(currentPrice)); // Single price as list of one
-                } catch (NumberFormatException e) {
+                    for (String p : priceStr.split(",")) {
+                        // trim and remove invisible/non-breaking spaces
+                        String cleanPrice = p.trim().replace("\u00A0", "");
+                        if (!cleanPrice.isEmpty()) {
+                            prices.add(new BigDecimal(cleanPrice));
+                        }
+                    }
+                } catch (Exception e) {
                     skippedCount++;
-                    skippedReasons.add("Invalid price format for product: " + productName + " (" + priceStr + ")");
+                    skippedReasons.add("Invalid price for product: " + productName);
                     continue;
                 }
+                dto.setProductPrice(prices);
 
-                // === Old Price (Column 4) - OPTIONAL ===
-                String oldPriceStr = getCellValue(row.getCell(4)).trim();
+                // ================= 4. OLD PRICES =================
+                List<BigDecimal> oldPrices = new ArrayList<>();
+                String oldPriceStr = getCellValue(row.getCell(4));
                 if (!oldPriceStr.isEmpty()) {
                     try {
-                        BigDecimal oldPrice = new BigDecimal(oldPriceStr);
-                        dto.setProductOldPrice(List.of(oldPrice));
-                    } catch (NumberFormatException e) {
-                        logger.warn("Invalid old price format for product {}: {}", productName, oldPriceStr);
-                        dto.setProductOldPrice(new ArrayList<>()); // Optional: keep empty if invalid
-                    }
-                } else {
-                    dto.setProductOldPrice(new ArrayList<>()); // No old price provided
-                }
-
-                // Stock (required)
-                String stock = getCellValue(row.getCell(5)).trim();
-                if (stock.isEmpty()) {
-                    skippedCount++;
-                    skippedReasons.add("Invalid or missing stock for product: " + productName);
-                    continue;
-                }
-                dto.setProductStock(stock);
-
-                // Other fields
-                dto.setProductStatus(getCellValue(row.getCell(6)));
-                dto.setProductDescription(getCellValue(row.getCell(7)));
-
-                Integer quantity = getIntegerCellValue(row.getCell(8));
-                if (quantity == null) {
-                    skippedCount++;
-                    skippedReasons.add("Invalid or missing quantity for product: " + productName);
-                    continue;
-                }
-                dto.setProductQuantity(quantity);
-
-                // Prescription Required (Column 13)
-                Boolean prescriptionReq = getBooleanCellValue(row.getCell(13));
-                dto.setPrescriptionRequired(prescriptionReq != null ? prescriptionReq : false);
-
-                // Optional fields
-                dto.setBrandName(getCellValue(row.getCell(14)));
-                dto.setMfgDate(getCellValue(row.getCell(15)));
-                dto.setExpDate(getCellValue(row.getCell(16)));
-                dto.setBatchNo(getCellValue(row.getCell(17)));
-
-                // Main image (Column 9)
-                String mainImageFilename = getCellValue(row.getCell(9)).trim();
-                if (!mainImageFilename.isEmpty()) {
-                    String mainBaseName = mainImageFilename.contains(".")
-                            ? mainImageFilename.substring(0, mainImageFilename.lastIndexOf('.'))
-                            : mainImageFilename;
-                    MultipartFile mainImage = imageMap.get(mainBaseName.toLowerCase());
-                    if (mainImage != null) {
-                        dto.setProductMainImage(mainImage);
-                    } else {
-                        skippedCount++;
-                        skippedReasons.add("Missing main image for product: " + productName + " (" + mainImageFilename + ")");
-                        continue;
-                    }
-                }
-
-                // Sub images (Column 10)
-                String subImagesStr = getCellValue(row.getCell(10));
-                List<MultipartFile> subImageFiles = new ArrayList<>();
-                if (subImagesStr != null && !subImagesStr.trim().isEmpty()) {
-                    String[] subFilenames = subImagesStr.split(",");
-                    boolean hasMissingSub = false;
-                    for (String subFilename : subFilenames) {
-                        String trimmedSub = subFilename.trim();
-                        if (trimmedSub.isEmpty()) continue;
-
-                        String subBaseName = trimmedSub.contains(".")
-                                ? trimmedSub.substring(0, trimmedSub.lastIndexOf('.'))
-                                : trimmedSub;
-                        MultipartFile subImage = imageMap.get(subBaseName.toLowerCase());
-                        if (subImage != null) {
-                            subImageFiles.add(subImage);
-                        } else {
-                            hasMissingSub = true;
-                            skippedReasons.add("Missing sub image for product: " + productName + " (" + trimmedSub + ")");
+                        for (String p : oldPriceStr.split(",")) {
+                            String cleanOld = p.trim().replace("\u00A0", "");
+                            if (!cleanOld.isEmpty()) {
+                                oldPrices.add(new BigDecimal(cleanOld));
+                            }
                         }
-                    }
-                    if (hasMissingSub) {
-                        skippedCount++;
-                        continue;
+                    } catch (Exception e) {
+                        oldPrices = new ArrayList<>();
                     }
                 }
-                dto.setProductSubImages(subImageFiles);
+                dto.setProductOldPrice(oldPrices);
 
-                // Dynamic fields (Column 11)
-                String dynamicFieldsStr = getCellValue(row.getCell(11));
-                Map<String, String> dynamicFields = new HashMap<>();
-                if (dynamicFieldsStr != null && !dynamicFieldsStr.trim().isEmpty()) {
-                    String[] pairs = dynamicFieldsStr.split(",");
-                    for (String pair : pairs) {
-                        String trimmedPair = pair.trim();
-                        if (trimmedPair.isEmpty()) continue;
-                        String[] kv = trimmedPair.split(":");
-                        if (kv.length == 2) {
-                            dynamicFields.put(kv[0].trim(), kv[1].trim());
-                        }
-                    }
-                }
-                dto.setProductDynamicFields(dynamicFields);
-
-                // Sizes (Column 12 - comma-separated)
-                String sizesStr = getCellValue(row.getCell(12));
+                // ================= 5. SIZES =================
                 List<String> sizes = new ArrayList<>();
-                if (sizesStr != null && !sizesStr.trim().isEmpty()) {
-                    sizes = Arrays.stream(sizesStr.split(","))
+                String sizeStr = getCellValue(row.getCell(12));
+                if (!sizeStr.isEmpty()) {
+                    sizes = Arrays.stream(sizeStr.split(","))
                             .map(String::trim)
+                            .map(s -> s.replace("\u00A0", "")) // remove non-breaking spaces
                             .filter(s -> !s.isEmpty())
                             .collect(Collectors.toList());
                 }
                 dto.setProductSizes(sizes);
 
-                // Benefits (Column 18)
-                String benefitsStr = getCellValue(row.getCell(18));
-                List<String> benefits = new ArrayList<>();
-                if (benefitsStr != null && !benefitsStr.trim().isEmpty()) {
-                    benefits = Arrays.stream(benefitsStr.split(","))
-                            .map(String::trim)
-                            .filter(s -> !s.isEmpty())
-                            .collect(Collectors.toList());
-                }
-                dto.setBenefitsList(benefits);
+                // ================= 6. AUTO-APPLY SINGLE PRICE TO MULTIPLE SIZES =================
+                if (sizes.size() > 1 && prices.size() == 1) {
+                    BigDecimal singlePrice = prices.get(0);
+                    prices = new ArrayList<>();
+                    for (int i = 0; i < sizes.size(); i++) {
+                        prices.add(singlePrice);
+                    }
+                    dto.setProductPrice(prices);
 
-                // Directions (Column 19)
-                String directionsStr = getCellValue(row.getCell(19));
-                List<String> directions = new ArrayList<>();
-                if (directionsStr != null && !directionsStr.trim().isEmpty()) {
-                    directions = Arrays.stream(directionsStr.split(","))
-                            .map(String::trim)
-                            .filter(s -> !s.isEmpty())
-                            .collect(Collectors.toList());
+                    // Similarly handle oldPrices if only one value exists
+                    if (oldPrices.size() == 1) {
+                        BigDecimal singleOld = oldPrices.get(0);
+                        oldPrices = new ArrayList<>();
+                        for (int i = 0; i < sizes.size(); i++) {
+                            oldPrices.add(singleOld);
+                        }
+                        dto.setProductOldPrice(oldPrices);
+                    }
                 }
-                dto.setDirectionsList(directions);
 
-                // Create product
+                // ================= 7. VALIDATE SIZE-PRICE MAPPING =================
                 try {
-                    createProduct(dto);
+                    validateSizePriceMapping(sizes, prices, oldPrices, productName);
+                } catch (IllegalArgumentException e) {
+                    skippedCount++;
+                    skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
+                    continue; // skip this product
+                }
+
+                // Optional debug log
+                logger.debug("Product: {}, Sizes: {}, Prices: {}, OldPrices: {}",
+                        productName, sizes, prices, oldPrices);
+
+                // ================= 8. QUANTITY =================
+                Integer quantity = getIntegerCellValue(row.getCell(8));
+                if (quantity == null) {
+                    skippedCount++;
+                    skippedReasons.add("Invalid quantity for product: " + productName);
+                    continue;
+                }
+                dto.setProductQuantity(quantity);
+
+                // ================= 9. MAIN IMAGE =================
+                String mainImageName = getCellValue(row.getCell(9)).trim();
+                if (!mainImageName.isEmpty()) {
+                    MultipartFile mainImage = imageMap.get(mainImageName.toLowerCase());
+                    if (mainImage != null) {
+                        dto.setProductMainImage(mainImage);
+                    } else {
+                        skippedCount++;
+                        skippedReasons.add("Missing main image: " + productName);
+                        continue;
+                    }
+                }
+
+                // ================= 10. SUB IMAGES =================
+                String subImagesStr = getCellValue(row.getCell(10));
+                List<MultipartFile> subImages = new ArrayList<>();
+                if (!subImagesStr.isEmpty()) {
+                    boolean missing = false;
+                    for (String name : subImagesStr.split(",")) {
+                        MultipartFile img = imageMap.get(name.trim().toLowerCase());
+                        if (img != null) subImages.add(img);
+                        else {
+                            missing = true;
+                            skippedReasons.add("Missing sub image: " + name);
+                        }
+                    }
+                    if (missing) {
+                        skippedCount++;
+                        continue;
+                    }
+                }
+                dto.setProductSubImages(subImages);
+
+                // ================= 11. DYNAMIC FIELDS =================
+                Map<String, String> dynamicFields = new HashMap<>();
+                String dynamicStr = getCellValue(row.getCell(11));
+                if (!dynamicStr.isEmpty()) {
+                    for (String pair : dynamicStr.split(",")) {
+                        String[] kv = pair.split(":");
+                        if (kv.length == 2) dynamicFields.put(kv[0].trim(), kv[1].trim());
+                    }
+                }
+                dto.setProductDynamicFields(dynamicFields);
+
+                // ================= 12. MEDICAL & BRAND INFO =================
+                dto.setPrescriptionRequired(Boolean.TRUE.equals(getBooleanCellValue(row.getCell(13))));
+                dto.setBrandName(getCellValue(row.getCell(14)));
+                dto.setMfgDate(getCellValue(row.getCell(15)));
+                dto.setExpDate(getCellValue(row.getCell(16)));
+                dto.setBatchNo(getCellValue(row.getCell(17)));
+
+                // ================= 13. LIST FIELDS =================
+                dto.setBenefitsList(parseCommaList(row.getCell(18)));
+                dto.setDirectionsList(parseCommaList(row.getCell(19)));
+                dto.setIngredientsList(parseCommaList(row.getCell(20)));
+
+                // ================= 14. CREATE PRODUCT =================
+                try {
+                    createProduct(dto); // your existing service method
                     uploadedCount++;
-                    logger.debug("Successfully uploaded product: {}", productName);
                 } catch (Exception e) {
                     skippedCount++;
-                    skippedReasons.add("Error creating product: " + productName + " - " + e.getMessage());
-                    logger.error("Failed to create product {}: {}", productName, e.getMessage(), e);
+                    skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
                 }
             }
+
         } catch (Exception e) {
-            logger.error("Error processing Excel file: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to process Excel file: " + e.getMessage(), e);
+            throw new RuntimeException("Bulk upload failed: " + e.getMessage(), e);
         }
 
+        // ================= 15. RETURN RESPONSE =================
         BulkUploadResponse response = new BulkUploadResponse();
         response.setUploadedCount(uploadedCount);
         response.setSkippedCount(skippedCount);
         response.setSkippedReasons(skippedReasons);
-
-        logger.debug("Bulk creation completed: {} uploaded, {} skipped", uploadedCount, skippedCount);
         return response;
+    }
+
+
+
+
+
+    // ================= Helper: Parse comma-separated list =================
+    private List<String> parseCommaList(Cell cell) {
+        String value = getCellValue(cell);
+        if (value == null || value.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+
+    // ================= Helper: Validate size-price mapping =================
+    private void validateSizePriceMapping(
+            List<String> sizes,
+            List<BigDecimal> prices,
+            List<BigDecimal> oldPrices,
+            String productName
+    ) {
+
+        if (sizes != null && !sizes.isEmpty()) {
+
+            if (prices == null || sizes.size() != prices.size()) {
+                throw new IllegalArgumentException(
+                        "Sizes count must match price count for product: " + productName
+                );
+            }
+
+            if (oldPrices != null && !oldPrices.isEmpty()
+                    && oldPrices.size() != prices.size()) {
+                throw new IllegalArgumentException(
+                        "Old price count must match price count for product: " + productName
+                );
+            }
+        }
     }
 
 

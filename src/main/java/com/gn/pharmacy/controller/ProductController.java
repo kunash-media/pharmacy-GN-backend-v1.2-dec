@@ -318,6 +318,7 @@ public class ProductController {
 
         try {
             BulkUploadResponse response = productService.bulkCreateProducts(excelFile, images);
+
             logger.info("Bulk upload completed: {} uploaded, {} skipped",
                     response.getUploadedCount(), response.getSkippedCount());
 
@@ -331,6 +332,7 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     @GetMapping("/get-category-by-path")
     public ResponseEntity<List<ProductResponseDto>> getByCategoryPath(

@@ -3,10 +3,8 @@ package com.gn.pharmacy.service.serviceImpl;
 import com.gn.pharmacy.dto.request.MbPRequestDto;
 import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.MbPResponseDto;
-import com.gn.pharmacy.dto.response.ProductResponseDto;
 import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.MbPEntity;
-import com.gn.pharmacy.entity.ProductEntity;
 import com.gn.pharmacy.repository.InventoryRepository;
 import com.gn.pharmacy.repository.MbPRepository;
 import com.gn.pharmacy.service.InventoryService;
@@ -175,26 +173,74 @@ public class MbPServiceImpl implements MbPService {
 
     @Override
     public List<MbPResponseDto> getAllMbProduct() {
-        logger.debug("Fetching all MB products");
+        return List.of();
+    }
+
+
+//    @Override
+//    public List<MbPResponseDto> getAllMbProduct() {
+//        logger.debug("Fetching all MB products");
+//
+//        try {
+//            List<MbPResponseDto> products = repo.findAll().stream()
+//                    .map(this::toDto)
+//                    .collect(Collectors.toList());
+//
+//            logger.debug("Fetched {} MB products", products.size());
+//            return products;
+//
+//        } catch (Exception e) {
+//            logger.error("Error fetching all MB products: {}", e.getMessage(), e);
+//            throw e;
+//        }
+//    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MbPResponseDto> getAllMbProduct(Pageable pageable) {
+        logger.debug("Fetching all MB products with pagination");
 
         try {
-            List<MbPResponseDto> products = repo.findAll().stream()
-                    .map(this::toDto)
-                    .collect(Collectors.toList());
-
-            logger.debug("Fetched {} MB products", products.size());
-            return products;
+            Page<MbPEntity> entities = repo.findAllWithPagination(pageable);
+            logger.debug("Fetched {} MB products (page {})",
+                    entities.getNumberOfElements(), pageable.getPageNumber());
+            return entities.map(this::toDto);
 
         } catch (Exception e) {
             logger.error("Error fetching all MB products: {}", e.getMessage(), e);
-            throw e;
+            throw new RuntimeException("Failed to retrieve all products: " + e.getMessage(), e);
+        }
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MbPResponseDto> getAllActiveProducts(Pageable pageable) {
+        try {
+            Page<MbPEntity> entities = repo.findAllActive(pageable);
+            return entities.map(this::toDto);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve active products: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MbPResponseDto> getAllActiveProducts() {
+        try {
+            List<MbPEntity> entities = repo.findAllActive();
+            return entities.stream()
+                    .map(this::toDto)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to retrieve active products: " + e.getMessage(), e);
         }
     }
 
     //============= NEW DELETD GET ALL HANDLED ====================//
 
-    @Override
     @Transactional(readOnly = true)
+    @Override
     public Page<MbPResponseDto> getAllProducts(Pageable pageable) {
         try {
             Page<MbPEntity> entities = repo.findAllActive(pageable);
@@ -204,8 +250,8 @@ public class MbPServiceImpl implements MbPService {
         }
     }
 
-    @Override
     @Transactional(readOnly = true)
+    @Override
     public List<MbPResponseDto> getAllProducts() {
         try {
             List<MbPEntity> entities = repo.findAllActive();
@@ -474,7 +520,9 @@ public class MbPServiceImpl implements MbPService {
         d.setFeatures(e.getFeatures());
         d.setSpecifications(e.getSpecifications());
         d.setCreatedAt(e.getCreatedAt());
+
         d.setApproved(e.isApproved());
+        d.setDeleted(e.isDeleted());
 
         Long id = e.getId();
         d.setMainImageUrl("/api/mb/products/" + id + "/image");

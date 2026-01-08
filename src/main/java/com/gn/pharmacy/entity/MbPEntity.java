@@ -1,6 +1,7 @@
 package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.SQLDelete;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -29,10 +30,12 @@ public class MbPEntity {
     // CHANGED: Now List<Double> instead of Double
     @ElementCollection
     @CollectionTable(name = "mbp_prices", joinColumns = @JoinColumn(name = "mbp_id"))
+    @BatchSize(size = 50)   //solve N+1 query problem
     @Column(name = "price")
     private List<Double> price = new ArrayList<>();
 
     @ElementCollection
+    @BatchSize(size = 50)
     @CollectionTable(name = "mbp_original_prices", joinColumns = @JoinColumn(name = "mbp_id"))
     @Column(name = "original_price")
     private List<Double> originalPrice = new ArrayList<>();
@@ -46,6 +49,7 @@ public class MbPEntity {
     private Integer stockQuantity;
 
     @ElementCollection
+    @BatchSize(size = 50)
     @CollectionTable(name = "mbp_description", joinColumns = @JoinColumn(name = "mbp_id"))
     @Column(name = "description_line")
     private List<String> description = new ArrayList<>();
@@ -53,11 +57,13 @@ public class MbPEntity {
     @ElementCollection
     @CollectionTable(name = "mbp_sizes", joinColumns = @JoinColumn(name = "mbp_id"))
     @Column(name = "size")
+    @BatchSize(size = 50)
     private List<String> productSizes = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "mbp_features", joinColumns = @JoinColumn(name = "mbp_id"))
     @Column(name = "feature")
+    @BatchSize(size = 50)
     private List<String> features = new ArrayList<>();
 
     @Lob
@@ -67,6 +73,7 @@ public class MbPEntity {
     @ElementCollection
     @CollectionTable(name = "mbp_sub_images", joinColumns = @JoinColumn(name = "mbp_id"))
     @Lob
+    @BatchSize(size = 50)
     @Column(columnDefinition = "LONGBLOB")
     private List<byte[]> productSubImages = new ArrayList<>();
 

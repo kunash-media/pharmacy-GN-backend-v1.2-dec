@@ -69,16 +69,32 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
     @Query("SELECT p FROM MbPEntity p WHERE p.id = ?1 AND p.isDeleted = true")
     Optional<MbPEntity> findDeletedById(Long id);
 
+    //====old method ==========//
     default List<MbPEntity> findAllActive() {
         return findAll(MbPEntity.notDeleted());
     }
 
-    default Page<MbPEntity> findAllActive(Pageable pageable) {
-        return findAll(MbPEntity.notDeleted(), pageable);
-    }
+//    default Page<MbPEntity> findAllActive(Pageable pageable) {
+//        return findAll(MbPEntity.notDeleted(), pageable);
+//    }
+
+    //===========================================//
+
+    @Query("SELECT m FROM MbPEntity m ORDER BY m.createdAt DESC")
+    Page<MbPEntity> findAllWithPagination(Pageable pageable);
+
+
 
     // New method to fetch non-deleted products by category
     @Query("SELECT p FROM MbPEntity p WHERE p.category = :category AND p.isDeleted = false")
     List<MbPEntity> findByProductCategoryAndNotDeleted(@Param("category") String category);
+
+
+    @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true")
+    List<MbPEntity> findAllActiveAndApproved();
+
+    // Keep this simple version (or your original one)
+    @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true ORDER BY m.createdAt DESC")
+    Page<MbPEntity> findAllActive(Pageable pageable);
 
 }

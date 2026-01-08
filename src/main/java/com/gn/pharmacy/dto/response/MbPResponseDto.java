@@ -10,8 +10,6 @@ public class MbPResponseDto {
     private String title;
     private String category;
     private String subCategory;
-//    private Double price;
-//    private Double originalPrice;
 
     private List<Double> price = new ArrayList<>();
     private List<Double> originalPrice = new ArrayList<>();
@@ -31,6 +29,7 @@ public class MbPResponseDto {
     private String mainImageUrl;
     private List<String> subImageUrls = new ArrayList<>();
 
+    private Boolean deleted;
 
     private Boolean approved;
 
@@ -118,5 +117,13 @@ public class MbPResponseDto {
 
     public void setApproved(Boolean approved) {
         this.approved = approved;
+    }
+
+    public Boolean getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(Boolean deleted) {
+        this.deleted = deleted;
     }
 }

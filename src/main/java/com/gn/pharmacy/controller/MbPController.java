@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -144,13 +145,36 @@ public class MbPController {
         }
     }
 
+//    @GetMapping("/get-all")
+//    public ResponseEntity<List<MbPResponseDto>> getAllMbProduct() {
+//        logger.info("Fetching all MB products");
+//
+//        try {
+//            List<MbPResponseDto> products = mbpService.getAllMbProduct();
+//            logger.info("Retrieved {} MB products", products.size());
+//            return ResponseEntity.ok(products);
+//
+//        } catch (Exception e) {
+//            logger.error("Error retrieving MB products: {}", e.getMessage(), e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
+
+
     @GetMapping("/get-all")
-    public ResponseEntity<List<MbPResponseDto>> getAllMbProduct() {
-        logger.info("Fetching all MB products");
+    public ResponseEntity<Page<MbPResponseDto>> getAllMbProduct(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+
+        logger.info("Fetching all MB products with pagination - page: {}, size: {}", page, size);
 
         try {
-            List<MbPResponseDto> products = mbpService.getAllMbProduct();
-            logger.info("Retrieved {} MB products", products.size());
+            Pageable pageable = PageRequest.of(page, size, getSort(sort));
+            Page<MbPResponseDto> products = mbpService.getAllMbProduct(pageable);
+
+            logger.info("Retrieved {} MB products (total: {})",
+                    products.getNumberOfElements(), products.getTotalElements());
             return ResponseEntity.ok(products);
 
         } catch (Exception e) {
@@ -159,23 +183,55 @@ public class MbPController {
         }
     }
 
-    @GetMapping("/get-all-product")
-    public ResponseEntity<List<MbPResponseDto>> getAllProducts(
+    @GetMapping("/get-all-mb-active-products")
+    public ResponseEntity<Page<MbPResponseDto>> getAllActiveProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String[] sort,
             @RequestParam(defaultValue = "100") long delayMillis) {
+
         try {
             // Add delay to simulate controlled response rate
             Thread.sleep(delayMillis);
 
-            Pageable pageable = PageRequest.of(page, size);
-            Page<MbPResponseDto> productPage = mbpService.getAllProducts(pageable);
+            Pageable pageable = PageRequest.of(page, size, getSort(sort));
+            Page<MbPResponseDto> productPage = mbpService.getAllActiveProducts(pageable);
 
-            return new ResponseEntity<>(productPage.getContent(), HttpStatus.OK);
+            return new ResponseEntity<>(productPage, HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    private Sort getSort(String[] sort) {
+        if (sort.length >= 2) {
+            return Sort.by(new Sort.Order(
+                    sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
+                    sort[0]
+            ));
+        }
+        return Sort.unsorted();
+    }
+
+
+
+//    @GetMapping("/get-all-mb-active-products")
+//    public ResponseEntity<List<MbPResponseDto>> getAllProducts(
+//            @RequestParam(defaultValue = "0") int page,
+//            @RequestParam(defaultValue = "10") int size,
+//            @RequestParam(defaultValue = "100") long delayMillis) {
+//        try {
+//            // Add delay to simulate controlled response rate
+//            Thread.sleep(delayMillis);
+//
+//            Pageable pageable = PageRequest.of(page, size);
+//            Page<MbPResponseDto> productPage = mbpService.getAllProducts(pageable);
+//
+//            return new ResponseEntity<>(productPage.getContent(), HttpStatus.OK);
+//        } catch (Exception e) {
+//            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MbPResponseDto> updateMbProduct(

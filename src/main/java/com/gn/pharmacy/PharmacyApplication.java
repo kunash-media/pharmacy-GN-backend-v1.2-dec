@@ -3,10 +3,12 @@ package com.gn.pharmacy;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.web.config.EnableSpringDataWebSupport;
 
 import java.util.TimeZone;
 
 @SpringBootApplication
+@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class PharmacyApplication {
 
 	public static void main(String[] args) {
