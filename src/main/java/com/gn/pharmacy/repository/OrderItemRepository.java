@@ -14,18 +14,38 @@ import java.util.List;
 public interface OrderItemRepository extends JpaRepository<OrderItemEntity, Long> {
 
     // Add inside OrderItemRepository interface
-    @Query("""
-    SELECT COALESCE(p.productName, m.title, 'Unknown Product'),
-           SUM(oi.quantity),
-           SUM(oi.subtotal)
-    FROM OrderItemEntity oi
-    LEFT JOIN oi.product p
-    LEFT JOIN oi.MbP m
-    JOIN oi.order o
-    WHERE o.orderDate >= :from
-    GROUP BY COALESCE(p.productId, m.id)
-    ORDER BY SUM(oi.subtotal) DESC
-    """)
-    List<Object[]> findTopSelling(@Param("from") LocalDateTime from, Pageable pageable);
-    // Replace both sumTotalAmount methods with these string-based versions
+//    @Query("""
+//    SELECT COALESCE(p.productName, m.title, 'Unknown Product'),
+//           SUM(oi.quantity),
+//           SUM(oi.subtotal)
+//    FROM OrderItemEntity oi
+//    LEFT JOIN oi.product p
+//    LEFT JOIN oi.MbP m
+//    JOIN oi.order o
+//    WHERE o.orderDate >= :from
+//    GROUP BY COALESCE(p.productId, m.id)
+//    ORDER BY SUM(oi.subtotal) DESC
+//    """)
+//    List<Object[]> findTopSelling(@Param("from") LocalDateTime from, Pageable pageable);
+
+
+    @Query(value = """
+    SELECT 
+        COALESCE(p.product_name, m.title, 'Unknown Product') as product_name,
+        SUM(oi.quantity) as total_quantity,
+        SUM(oi.subtotal) as total_revenue
+    FROM order_items oi
+    LEFT JOIN products p ON oi.product_id = p.product_id
+    LEFT JOIN mb_products m ON oi.mbp_id = m.id
+    JOIN orders_table o ON oi.order_id = o.order_id
+    WHERE STR_TO_DATE(o.order_date, '%d/%m/%Y %h:%i %p') >= :fromDate
+    GROUP BY COALESCE(p.product_name, m.title, 'Unknown Product')
+    ORDER BY total_revenue DESC
+    LIMIT :limit
+    """, nativeQuery = true)
+    List<Object[]> findTopSelling(
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("limit") int limit
+    );
+
 }

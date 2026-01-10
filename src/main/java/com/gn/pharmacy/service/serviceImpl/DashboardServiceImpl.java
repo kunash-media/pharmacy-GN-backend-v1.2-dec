@@ -120,15 +120,29 @@ public class DashboardServiceImpl implements DashboardService {
                 .toList();
     }
 
+//    @Override
+//    public List<TopSellingDto> getTopSellingProducts(int limit, int months) {
+//        LocalDateTime from = LocalDateTime.now().minusMonths(months);
+//        return orderItemRepository.findTopSelling(from, PageRequest.of(0, limit)).stream()
+//                .map(row -> {
+//                    Object[] arr = (Object[]) row;
+//                    return new TopSellingDto((String) arr[0], (Long) arr[1], (BigDecimal) arr[2]);
+//                })
+//                .toList();
+//    }
+
+
     @Override
     public List<TopSellingDto> getTopSellingProducts(int limit, int months) {
-        LocalDateTime from = LocalDateTime.now().minusMonths(months);
-        return orderItemRepository.findTopSelling(from, PageRequest.of(0, limit)).stream()
-                .map(row -> {
-                    Object[] arr = (Object[]) row;
-                    return new TopSellingDto((String) arr[0], (Long) arr[1], (BigDecimal) arr[2]);
-                })
-                .toList();
+        LocalDateTime fromDate = LocalDateTime.now().minusMonths(months);
+
+        return orderItemRepository.findTopSelling(fromDate, limit).stream()
+                .map(row -> new TopSellingDto(
+                        (String) row[0],               // product_name
+                        ((Number) row[1]).longValue(), // total_quantity
+                        BigDecimal.valueOf(((Number) row[2]).doubleValue()) // total_revenue as BigDecimal
+                ))
+                .collect(Collectors.toList());
     }
 
     @Override
