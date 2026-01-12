@@ -95,4 +95,13 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long>,
     // 4. By SubCategory – only active & approved
     @Query("SELECT p FROM ProductEntity p WHERE p.productSubCategory = :subCategory AND p.isDeleted = false AND p.isApproved = true")
     List<ProductEntity> findByProductSubCategoryAndActive(@Param("subCategory") String subCategory);
+
+
+    //reports query
+
+    @Query("SELECT DISTINCT p.productCategory FROM ProductEntity p WHERE p.isDeleted = false")
+    List<String> findDistinctCategories();
+
+    @Query("SELECT DISTINCT p.productSubCategory FROM ProductEntity p WHERE p.productCategory = :category AND p.isDeleted = false")
+    List<String> findDistinctSubcategoriesByCategory(@Param("category") String category);
 }

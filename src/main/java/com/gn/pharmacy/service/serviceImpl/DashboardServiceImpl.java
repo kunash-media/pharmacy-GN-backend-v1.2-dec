@@ -18,7 +18,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DashboardServiceImpl implements DashboardService {
 
@@ -28,6 +27,17 @@ public class DashboardServiceImpl implements DashboardService {
     private final MbPRepository mbpRepository;
     private final PrescriptionRepository prescriptionRepository;
     private final InventoryRepository inventoryRepository;
+
+
+    public DashboardServiceImpl(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
+                                ProductRepository productRepository, MbPRepository mbpRepository, PrescriptionRepository prescriptionRepository, InventoryRepository inventoryRepository) {
+        this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.productRepository = productRepository;
+        this.mbpRepository = mbpRepository;
+        this.prescriptionRepository = prescriptionRepository;
+        this.inventoryRepository = inventoryRepository;
+    }
 
     @Override
     public DashboardSummaryDto getDashboardSummary() {

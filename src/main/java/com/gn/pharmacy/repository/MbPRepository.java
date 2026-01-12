@@ -97,4 +97,11 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
     @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true ORDER BY m.createdAt DESC")
     Page<MbPEntity> findAllActive(Pageable pageable);
 
+
+    //reports
+    @Query("SELECT DISTINCT m.category FROM MbPEntity m WHERE m.isDeleted = false")
+    List<String> findDistinctCategories();
+
+    @Query("SELECT DISTINCT m.subCategory FROM MbPEntity m WHERE m.category = :category AND m.isDeleted = false")
+    List<String> findDistinctSubcategoriesByCategory(@Param("category") String category);
 }
