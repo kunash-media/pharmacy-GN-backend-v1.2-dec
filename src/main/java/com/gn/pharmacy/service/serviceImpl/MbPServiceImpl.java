@@ -419,8 +419,29 @@ public class MbPServiceImpl implements MbPService {
         if (StringUtils.hasText(d.getTitle())) e.setTitle(d.getTitle());
         if (StringUtils.hasText(d.getCategory())) e.setCategory(d.getCategory());
         if (StringUtils.hasText(d.getSubCategory())) e.setSubCategory(d.getSubCategory());
-        if (d.getPrice() != null) e.setPrice(d.getPrice());
-        if (d.getOriginalPrice() != null) e.setOriginalPrice(d.getOriginalPrice());
+
+        // FIX: Only update price if DTO has non-empty list (not null and not empty)
+        if (d.getPrice() != null && !d.getPrice().isEmpty()) {
+            e.setPrice(d.getPrice());
+            logger.debug("Price updated to: {}", d.getPrice());
+        } else if (d.getPrice() != null && d.getPrice().isEmpty()) {
+            logger.warn("Empty price list provided - preserving existing price: {}", e.getPrice());
+            // Don't update - keep existing price
+        }
+
+        // FIX: Only update originalPrice if DTO has non-empty list
+        if (d.getOriginalPrice() != null && !d.getOriginalPrice().isEmpty()) {
+            e.setOriginalPrice(d.getOriginalPrice());
+            logger.debug("OriginalPrice updated to: {}", d.getOriginalPrice());
+        } else if (d.getOriginalPrice() != null && d.getOriginalPrice().isEmpty()) {
+            logger.warn("Empty originalPrice list provided - preserving existing: {}", e.getOriginalPrice());
+            // Don't update - keep existing originalPrice
+        }
+
+//        if (d.getPrice() != null) e.setPrice(d.getPrice());
+//        if (d.getOriginalPrice() != null) e.setOriginalPrice(d.getOriginalPrice());
+
+
         if (d.getDiscount() != null) e.setDiscount(d.getDiscount());
         if (d.getRating() != null) e.setRating(d.getRating());
         if (d.getReviewCount() != null) e.setReviewCount(d.getReviewCount());

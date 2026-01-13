@@ -1,10 +1,8 @@
 package com.gn.pharmacy.repository;
 
 import com.gn.pharmacy.entity.MbPEntity;
-import com.gn.pharmacy.entity.ProductEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -78,6 +76,7 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
 //        return findAll(MbPEntity.notDeleted(), pageable);
 //    }
 
+
     //===========================================//
 
     @Query("SELECT m FROM MbPEntity m ORDER BY m.createdAt DESC")
@@ -86,12 +85,12 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
 
 
     // New method to fetch non-deleted products by category
-    @Query("SELECT p FROM MbPEntity p WHERE p.category = :category AND p.isDeleted = false")
+    @Query("SELECT p FROM MbPEntity p WHERE p.category = :category AND p.isDeleted = false AND p.approved = true")
     List<MbPEntity> findByProductCategoryAndNotDeleted(@Param("category") String category);
 
 
-    @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true")
-    List<MbPEntity> findAllActiveAndApproved();
+//    @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true")
+//    List<MbPEntity> findAllActiveAndApproved();
 
     // Keep this simple version (or your original one)
     @Query("SELECT m FROM MbPEntity m WHERE m.isDeleted = false AND m.approved = true ORDER BY m.createdAt DESC")
@@ -104,4 +103,12 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
 
     @Query("SELECT DISTINCT m.subCategory FROM MbPEntity m WHERE m.category = :category AND m.isDeleted = false")
     List<String> findDistinctSubcategoriesByCategory(@Param("category") String category);
+
+
+
+    // ==== ADD ONLY THIS ONE METHOD ====
+    @Query("SELECT p FROM MbPEntity p WHERE p.category = :category AND p.isDeleted = false AND p.approved = true")
+    List<MbPEntity> findByCategoryAndActive(@Param("category") String category);
+
+
 }
