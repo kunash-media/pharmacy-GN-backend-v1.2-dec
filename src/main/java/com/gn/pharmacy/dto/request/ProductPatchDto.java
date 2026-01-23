@@ -1,10 +1,15 @@
 package com.gn.pharmacy.dto.request;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+
+/**
+ * DTO for **partial updates** (PATCH) of Products.
+ * All fields are optional — null means "do not update this field".
+ * Uses wrapper types (Boolean, Integer, Double) to distinguish "not set" from explicit false/0.
+ */
 public class ProductPatchDto {
 
     private String sku;
@@ -18,37 +23,40 @@ public class ProductPatchDto {
     private String productStock;
     private String productStatus;
     private String productDescription;
+
     private Integer productQuantity;
-    private Boolean prescriptionRequired;  // Use Boolean wrapper to distinguish not-set vs false
+    private Boolean prescriptionRequired;   // null = don't change, Boolean allows explicit false
     private String brandName;
+
     private String mfgDate;
     private String expDate;
     private String batchNo;
+
     private Double rating;
 
     private List<String> benefitsList;
     private List<String> ingredientsList;
     private List<String> directionsList;
     private List<String> categoryPath;
+
     private Map<String, String> productDynamicFields;
+
     private List<String> productSizes;
 
-    private Boolean approved;   // Use Boolean instead of boolean
-    private Boolean deleted;
+    private Boolean approved;   // null = don't change
+    private Boolean deleted;    // null = don't change
 
+    // ────────────────────────────────────────────────
+    // Constructors
+    // ────────────────────────────────────────────────
 
-
-    // Default constructor
     public ProductPatchDto() {
-        this.benefitsList = new ArrayList<>();
-        this.ingredientsList = new ArrayList<>();
-        this.directionsList = new ArrayList<>();
-        this.categoryPath = new ArrayList<>();
-        this.productSizes = new ArrayList<>();
+        // Default no-arg constructor
     }
 
-    // Getters and Setters (or use Lombok @Getter @Setter)
-
+    // ────────────────────────────────────────────────
+    // Getters & Setters (with safe defaults for collections/maps)
+    // ────────────────────────────────────────────────
 
     public String getSku() {
         return sku;

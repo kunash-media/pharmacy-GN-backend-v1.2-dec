@@ -43,12 +43,11 @@ public class OrderServiceImpl implements OrderService {
         this.orderItemRepository = orderItemRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
-        this.mbpRepository =  mbpRepository;
+        this.mbpRepository = mbpRepository;
     }
 
-
-
     @Override
+    @Transactional
     public OrderResponseDto createOrder(OrderRequestDto orderRequestDto) {
 
         logger.info("Creating new order for userId: {}", orderRequestDto.getUserId());
@@ -62,13 +61,8 @@ public class OrderServiceImpl implements OrderService {
         orderEntity.setOrderDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a")));
         mapOrderFields(orderRequestDto, orderEntity);
 
-        // Save order first to get orderId (needed for order items)
         OrderEntity savedEntity = orderRepository.save(orderEntity);
 
-        List<OrderItemEntity> orderItemsToSave = new ArrayList<>();
-
-        // Process inventory deduction and validate order items
-        // Process inventory deduction and validate order items
         if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
 
             for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
@@ -80,7 +74,6 @@ public class OrderServiceImpl implements OrderService {
                 Long productId = itemDto.getProductId();
                 Long mbpId = itemDto.getMbpId();
 
-                // CRITICAL VALIDATION: Exactly one of productId or mbpId must be present
                 if ((productId == null && mbpId == null) || (productId != null && mbpId != null)) {
                     throw new RuntimeException(
                             "Invalid order item: exactly one of 'productId' or 'mbpId' must be provided. " +
@@ -89,71 +82,81 @@ public class OrderServiceImpl implements OrderService {
                     );
                 }
 
-                List<InventoryEntity> batches = null;
-                Object parentEntity = null;
-                Long itemId = null;
-                String itemType = "";
+                List<InventoryEntity> batches;
+                Object parentEntity;
 
                 if (productId != null) {
                     ProductEntity product = productRepository.findById(productId)
                             .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
                     batches = product.getInventoryBatches();
                     parentEntity = product;
-                    itemId = productId;
-                    itemType = "Product";
-                } else { // mbpId != null
+                } else {
                     MbPEntity mbp = mbpRepository.findById(mbpId)
                             .orElseThrow(() -> new RuntimeException("MbP product not found with ID: " + mbpId));
                     batches = mbp.getInventoryBatches();
                     parentEntity = mbp;
-                    itemId = mbpId;
-                    itemType = "MbP";
                 }
 
                 if (batches == null || batches.isEmpty()) {
-                    throw new RuntimeException("No inventory batches found for " + itemType + " ID: " + itemId);
+                    throw new RuntimeException("No inventory batches found for item: " + itemDto.getItemName());
                 }
 
-                int required = itemDto.getQuantity();
-                int remainingToDeduct = required;
+                String requestedSize = itemDto.getSize();
+                int remainingToDeduct = itemDto.getQuantity();
 
-                // Sort by inventoryId (FIFO - oldest first)
-                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId));
+                boolean deducted = false;
 
                 for (InventoryEntity batch : batches) {
                     if (remainingToDeduct <= 0) break;
 
-                    if (batch.getQuantity() > 0) {
-                        int deduct = Math.min(batch.getQuantity(), remainingToDeduct);
-                        batch.setQuantity(batch.getQuantity() - deduct);
-                        remainingToDeduct -= deduct;
+                    List<BatchVariant> variants = batch.getVariants();
+                    if (variants == null || variants.isEmpty()) continue;
 
-                        logger.info("Deducted {} from batch {} ({} ID: {}). Remaining: {}",
-                                deduct, batch.getBatchNo(), itemType, itemId, batch.getQuantity());
+                    // Find variant matching the requested size (case-insensitive, allow null for no-size)
+                    BatchVariant targetVariant = variants.stream()
+                            .filter(v -> {
+                                String variantSize = v.getSize();
+                                if (requestedSize == null || requestedSize.trim().isEmpty()) {
+                                    return variantSize == null || variantSize.trim().isEmpty();
+                                }
+                                return requestedSize.equalsIgnoreCase(variantSize);
+                            })
+                            .findFirst()
+                            .orElse(null);
+
+                    if (targetVariant != null && targetVariant.getQuantity() != null && targetVariant.getQuantity() > 0) {
+                        int deduct = Math.min(targetVariant.getQuantity(), remainingToDeduct);
+                        targetVariant.setQuantity(targetVariant.getQuantity() - deduct);
+                        remainingToDeduct -= deduct;
+                        deducted = true;
+
+                        logger.info("Deducted {} from batch {} variant size '{}' (parent ID: {})",
+                                deduct, batch.getBatchNo(), targetVariant.getSize(),
+                                productId != null ? productId : mbpId);
                     }
                 }
 
                 if (remainingToDeduct > 0) {
-                    int available = batches.stream().mapToInt(InventoryEntity::getQuantity).sum();
-                    throw new RuntimeException(
-                            "Insufficient stock for " + itemType + " ID: " + itemId +
-                                    ". Required: " + required + ", Available: " + available
-                    );
+                    throw new RuntimeException(String.format(
+                            "Insufficient stock for size '%s'. Required: %d, Available: not enough (item: %s)",
+                            requestedSize != null ? requestedSize : "default",
+                            itemDto.getQuantity(), itemDto.getItemName()
+                    ));
                 }
 
-                // Save updated inventory (Product or MbP)
+                // Save parent to persist variant changes
                 if (parentEntity instanceof ProductEntity) {
                     productRepository.save((ProductEntity) parentEntity);
                 } else if (parentEntity instanceof MbPEntity) {
                     mbpRepository.save((MbPEntity) parentEntity);
                 }
 
-                // Create and ADD OrderItemEntity to the collection (cascade will handle saving)
+                // Create order item and store ordered size
                 OrderItemEntity orderItem = createOrderItemEntity(itemDto, savedEntity, parentEntity);
+                orderItem.setSize(requestedSize);
                 savedEntity.getOrderItems().add(orderItem);
             }
 
-            // Save the order entity (cascades to items, populates IDs in collection)
             savedEntity = orderRepository.save(savedEntity);
         } else {
             logger.warn("Order created with no items for userId: {}", orderRequestDto.getUserId());
@@ -164,157 +167,6 @@ public class OrderServiceImpl implements OrderService {
     }
 
 
-//    @Override
-//    public OrderResponseDto createOrder(OrderRequestDto orderRequestDto) {
-//
-//        logger.info("Creating new order");
-//
-//        OrderEntity orderEntity = new OrderEntity();
-//
-//        UserEntity user = userRepository.findById(orderRequestDto.getUserId())
-//                .orElseThrow(() -> new RuntimeException("User not found with ID: " + orderRequestDto.getUserId()));
-//        orderEntity.setUser(user);
-//
-//        orderEntity.setOrderDate(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM/dd/yyyy hh:mm a")));
-//        mapOrderFields(orderRequestDto, orderEntity);
-//
-//        OrderEntity savedEntity = orderRepository.save(orderEntity);
-//
-//
-//        // NEW FIX : Deduct product quantities
-//        // Deduct from actual inventory batches (FIFO: oldest batches first)
-//
-//        if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
-//            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
-//                if (itemDto.getQuantity() <= 0) {
-//                    continue;
-//                }
-//
-//                List<InventoryEntity> batches = null;
-//                Object entityToSave = null;
-//
-//                if (itemDto.getProductId() != null) {
-//                    // Existing flow for ProductEntity
-//                    ProductEntity product = productRepository.findById(itemDto.getProductId())
-//                            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
-//                    batches = product.getInventoryBatches();
-//                    entityToSave = product;
-//                } else if (itemDto.getMbpId() != null) {
-//                    // New flow for MbPEntity (mirroring ProductEntity)
-//                    MbPEntity mbp = mbpRepository.findById(itemDto.getMbpId())
-//                            .orElseThrow(() -> new RuntimeException("MbP not found with ID: " + itemDto.getMbpId()));
-//                    batches = mbp.getInventoryBatches();
-//                    entityToSave = mbp;
-//                } else {
-//                    continue;  // Skip if neither ID is provided
-//                }
-//
-//                if (batches == null || batches.isEmpty()) {
-//                    throw new RuntimeException("No inventory available for item with ID: " +
-//                            (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()));
-//                }
-//
-//                int required = itemDto.getQuantity();
-//                int remainingToDeduct = required;
-//
-//                // Sort batches by oldest first (FIFO by ID; adjust comparator if needed, e.g., by mfgDate)
-//                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId));
-//
-//                for (InventoryEntity batch : batches) {
-//                    if (remainingToDeduct <= 0) break;
-//
-//                    if (batch.getQuantity() > 0) {
-//                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
-//                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
-//                        remainingToDeduct -= deductFromThisBatch;
-//
-//                        logger.info("Deducted {} from batch {} (item ID: {}). Remaining in batch: {}",
-//                                deductFromThisBatch, batch.getBatchNo(),
-//                                (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()),
-//                                batch.getQuantity());
-//                    }
-//                }
-//
-//                if (remainingToDeduct > 0) {
-//                    throw new RuntimeException("Insufficient inventory for item ID: " +
-//                            (itemDto.getProductId() != null ? itemDto.getProductId() : itemDto.getMbpId()) +
-//                            ". Required: " + required + ", Available across batches: " +
-//                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
-//                }
-//
-//                // Save the updated entity (ProductEntity or MbPEntity)
-//                if (entityToSave instanceof ProductEntity) {
-//                    productRepository.save((ProductEntity) entityToSave);
-//                } else if (entityToSave instanceof MbPEntity) {
-//                    mbpRepository.save((MbPEntity) entityToSave);
-//                }
-//            }
-//
-//            // Existing code to create and save order items (unchanged)
-//            List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
-//                    .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
-//                    .collect(Collectors.toList());
-//            orderItemRepository.saveAll(orderItems);
-//            savedEntity.setOrderItems(orderItems);
-//        }
-//
-//
-//        if (orderRequestDto.getOrderItems() != null && !orderRequestDto.getOrderItems().isEmpty()) {
-//            for (OrderItemDto itemDto : orderRequestDto.getOrderItems()) {
-//                if (itemDto.getProductId() == null || itemDto.getQuantity() <= 0) {
-//                    continue;
-//                }
-//
-//                // Fetch product with inventory batches
-//                ProductEntity product = productRepository.findById(itemDto.getProductId())
-//                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
-//
-//                // Load inventory batches (assuming lazy, but since we're in transaction, it's ok)
-//                List<InventoryEntity> batches = product.getInventoryBatches();
-//                if (batches == null || batches.isEmpty()) {
-//                    throw new RuntimeException("No inventory available for product ID: " + itemDto.getProductId());
-//                }
-//
-//                int required = itemDto.getQuantity();
-//                int remainingToDeduct = required;
-//
-//                // Sort batches by oldest first (you can change criteria: mfgDate, inventoryId, etc.)
-//                batches.sort(Comparator.comparing(InventoryEntity::getInventoryId)); // FIFO by ID (or parse mfgDate if needed)
-//
-//                for (InventoryEntity batch : batches) {
-//                    if (remainingToDeduct <= 0) break;
-//
-//                    if (batch.getQuantity() > 0) {
-//                        int deductFromThisBatch = Math.min(batch.getQuantity(), remainingToDeduct);
-//                        batch.setQuantity(batch.getQuantity() - deductFromThisBatch);
-//                        remainingToDeduct -= deductFromThisBatch;
-//
-//                        logger.info("Deducted {} from batch {} (product ID: {}). Remaining in batch: {}",
-//                                deductFromThisBatch, batch.getBatchNo(), product.getProductId(), batch.getQuantity());
-//                    }
-//                }
-//
-//                if (remainingToDeduct > 0) {
-//                    throw new RuntimeException("Insufficient inventory for product ID: " + itemDto.getProductId() +
-//                            ". Required: " + required + ", Available across batches: " +
-//                            batches.stream().mapToInt(InventoryEntity::getQuantity).sum());
-//                }
-//
-//                // Save updated batches (cascade should handle it, but safe to save product)
-//                productRepository.save(product);
-//            }
-//
-//            // After deduction, proceed to create order items...
-//            List<OrderItemEntity> orderItems = orderRequestDto.getOrderItems().stream()
-//                    .map(itemDto -> createOrderItemEntity(itemDto, savedEntity))
-//                    .collect(Collectors.toList());
-//            orderItemRepository.saveAll(orderItems);
-//            savedEntity.setOrderItems(orderItems);
-//        }
-//
-//        logger.info("Order created with ID: {}", savedEntity.getOrderId());
-//        return mapToResponseDto(savedEntity);
-//    }
 
 
     // === ADD THIS METHOD TO OrderServiceImpl.java ===
@@ -435,7 +287,6 @@ public class OrderServiceImpl implements OrderService {
         if (orderRequestDto.getDeliveryDate() != null) orderEntity.setDeliveryDate(orderRequestDto.getDeliveryDate());
 
         if (orderRequestDto.getOrderItems() != null) {
-            // === Same as in patchOrder ===
             if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
                 orderItemRepository.deleteAll(orderEntity.getOrderItems());
                 orderEntity.getOrderItems().clear();
@@ -511,29 +362,6 @@ public class OrderServiceImpl implements OrderService {
         orderEntity.setDeliveryDate(requestDto.getDeliveryDate());
     }
 
-//    private OrderItemEntity createOrderItemEntity(OrderItemDto itemDto, OrderEntity orderEntity) {
-//        OrderItemEntity orderItemEntity = new OrderItemEntity();
-//        orderItemEntity.setOrder(orderEntity);
-//
-//        // FIX: Use the values from the DTO instead of fetching from database
-//        // This preserves the prices at the time of order placement
-//        if (itemDto.getProductId() != null) {
-//            ProductEntity product = productRepository.findById(itemDto.getProductId())
-//                    .orElseThrow(() -> new RuntimeException("Product not found with ID: " + itemDto.getProductId()));
-//            orderItemEntity.setProduct(product);
-//        }
-//
-//        // Always use the values from the request DTO
-//        orderItemEntity.setItemName(itemDto.getItemName());
-//        orderItemEntity.setItemPrice(itemDto.getItemPrice());
-//        orderItemEntity.setItemOldPrice(itemDto.getItemOldPrice());
-//        orderItemEntity.setQuantity(itemDto.getQuantity());
-//        orderItemEntity.setSubtotal(itemDto.getSubtotal());
-//
-//        return orderItemEntity;
-//    }
-
-
     private OrderItemEntity createOrderItemEntity(OrderItemDto dto, OrderEntity order, Object parentEntity) {
         OrderItemEntity entity = new OrderItemEntity();
         entity.setOrder(order);
@@ -556,7 +384,6 @@ public class OrderServiceImpl implements OrderService {
 
         return entity;
     }
-
 
     private OrderResponseDto mapToResponseDto(OrderEntity orderEntity) {
         OrderResponseDto responseDto = new OrderResponseDto();
@@ -608,16 +435,14 @@ public class OrderServiceImpl implements OrderService {
                         itemDto.setItemOldPrice(item.getItemOldPrice());
                         itemDto.setSubtotal(item.getSubtotal());
                         itemDto.setItemName(item.getItemName());
+                        itemDto.setSize(item.getSize());
 
                         // === MAIN IMAGE URL LOGIC ===
                         String mainImageUrl = null;
 
                         if (item.getProduct() != null && item.getProduct().getProductId() != null) {
-                            // Regular Product - uses /api/products/{id}/image
                             mainImageUrl = "/api/products/" + item.getProduct().getProductId() + "/image";
-
                         } else if (item.getMbP() != null && item.getMbP().getId() != null) {
-                            // MbP Product - uses /api/mb/products/{id}/image
                             mainImageUrl = "/api/mb/products/" + item.getMbP().getId() + "/image";
                         }
 
@@ -629,155 +454,118 @@ public class OrderServiceImpl implements OrderService {
 
             responseDto.setOrderItems(orderItemDtos);
         } else {
-            responseDto.setOrderItems(new ArrayList<>()); // Ensure never null
+            responseDto.setOrderItems(new ArrayList<>());
         }
 
         return responseDto;
     }
 
 
-//    private OrderResponseDto mapToResponseDto(OrderEntity orderEntity) {
-//        OrderResponseDto responseDto = new OrderResponseDto();
-//        responseDto.setOrderId(orderEntity.getOrderId());
-//        responseDto.setUserId(orderEntity.getUser() != null ? orderEntity.getUser().getUserId() : null);
-//        responseDto.setShippingAddress(orderEntity.getShippingAddress());
-//        responseDto.setShippingAddress2(orderEntity.getShippingAddress2());
-//        responseDto.setShippingCity(orderEntity.getShippingCity());
-//        responseDto.setShippingState(orderEntity.getShippingState());
-//        responseDto.setShippingPincode(orderEntity.getShippingPincode());
-//        responseDto.setShippingCountry(orderEntity.getShippingCountry());
-//        responseDto.setShippingFirstName(orderEntity.getShippingFirstName());
-//        responseDto.setShippingLastName(orderEntity.getShippingLastName());
-//        responseDto.setShippingEmail(orderEntity.getShippingEmail());
-//        responseDto.setShippingPhone(orderEntity.getShippingPhone());
-//        responseDto.setCustomerFirstName(orderEntity.getCustomerFirstName());
-//        responseDto.setCustomerLastName(orderEntity.getCustomerLastName());
-//        responseDto.setCustomerPhone(orderEntity.getCustomerPhone());
-//        responseDto.setCustomerEmail(orderEntity.getCustomerEmail());
-//        responseDto.setPaymentMethod(orderEntity.getPaymentMethod());
-//        responseDto.setTotalAmount(orderEntity.getTotalAmount());
-//        responseDto.setTax(orderEntity.getTax());
-//        responseDto.setCouponApplied(orderEntity.getCouponApplied());
-//        responseDto.setConvenienceFee(orderEntity.getConvenienceFee());
-//        responseDto.setDiscountPercent(orderEntity.getDiscountPercent());
-//        responseDto.setDiscountAmount(orderEntity.getDiscountAmount());
-//        responseDto.setOrderStatus(orderEntity.getOrderStatus());
-//        responseDto.setOrderDate(orderEntity.getOrderDate());
-//        responseDto.setDeliveryDate(orderEntity.getDeliveryDate());
-//
-//        if (orderEntity.getOrderItems() != null) {
-//            List<OrderItemDto> orderItemDtos = orderEntity.getOrderItems().stream()
-//                    .map(item -> {
-//                        OrderItemDto itemDto = new OrderItemDto();
-//                        itemDto.setOrderItemId(item.getOrderItemId());
-//                        itemDto.setProductId(item.getProduct() != null ? item.getProduct().getProductId() : null);
-//                        itemDto.setQuantity(item.getQuantity());
-//                        itemDto.setItemPrice(item.getItemPrice());
-//                        itemDto.setItemOldPrice(item.getItemOldPrice());
-//                        itemDto.setSubtotal(item.getSubtotal());
-//                        itemDto.setItemName(item.getItemName());
-//                        // ADD MAIN IMAGE URL
-//                        if (item.getProduct() != null && item.getProduct().getProductId() != null) {
-//                            String imageUrl = "/api/products/" + item.getProduct().getProductId() + "/image";
-//                            itemDto.setProductMainImage(imageUrl);
-//                        }
-//                        return itemDto;
-//                    })
-//                    .collect(Collectors.toList());
-//            responseDto.setOrderItems(orderItemDtos);
-//        }
-//
-//        return responseDto;
-//    }
 
-
-    //=============== Cancel Order with Restore Product Quantity ================//
 
     @Override
+    @Transactional
     public OrderResponseDto cancelOrder(Long orderId) {
         logger.info("Cancelling order with ID: {}", orderId);
 
         OrderEntity orderEntity = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with ID: " + orderId));
 
-        // Check if order can be cancelled
         if ("CANCELLED".equals(orderEntity.getOrderStatus())) {
             throw new RuntimeException("Order is already cancelled");
         }
-
         if ("DELIVERED".equals(orderEntity.getOrderStatus())) {
             throw new RuntimeException("Cannot cancel delivered order");
         }
 
-        // Restore product quantities
-
-        // Restore inventory on cancellation
+        // Restore stock to correct variant
         if (orderEntity.getOrderItems() != null && !orderEntity.getOrderItems().isEmpty()) {
             for (OrderItemEntity item : orderEntity.getOrderItems()) {
+
                 ProductEntity product = item.getProduct();
-                if (product == null) continue;
+                MbPEntity mbp = item.getMbP();
+                String orderedSize = item.getSize();
+
+                if (product == null && mbp == null) continue;
+
+                List<InventoryEntity> batches = product != null
+                        ? product.getInventoryBatches()
+                        : mbp.getInventoryBatches();
 
                 int quantityToRestore = item.getQuantity();
                 if (quantityToRestore <= 0) continue;
 
-                List<InventoryEntity> batches = product.getInventoryBatches();
-                if (batches == null || batches.isEmpty()) {
-                    // Optional: create a new "returned" batch? Or just skip?
-                    // For now, create a new batch for returned stock
-                    InventoryEntity returnedBatch = new InventoryEntity();
-                    returnedBatch.setProduct(product);
-                    returnedBatch.setBatchNo("RETURNED-" + orderId + "-" + item.getOrderItemId());
-                    returnedBatch.setMfgDate("N/A");
-                    returnedBatch.setExpDate("N/A");
-                    returnedBatch.setQuantity(quantityToRestore);
-                    returnedBatch.setStockStatus("AVAILABLE");
-                    batches.add(returnedBatch);
-                    product.getInventoryBatches().add(returnedBatch);
-                    logger.info("Created returned batch for {} units of product ID: {}", quantityToRestore, product.getProductId());
-                } else {
-                    // Add back to newest batch (last in list) - or you can sort reverse
-                    batches.sort(Comparator.comparing(InventoryEntity::getInventoryId).reversed()); // newest first
+                boolean restored = false;
 
-                    int remainingToRestore = quantityToRestore;
-                    for (InventoryEntity batch : batches) {
-                        if (remainingToRestore <= 0) break;
-                        int addToThisBatch = remainingToRestore;
-                        batch.setQuantity(batch.getQuantity() + addToThisBatch);
-                        remainingToRestore -= addToThisBatch;
-                        logger.info("Restored {} units to batch {} (product ID: {})", addToThisBatch, batch.getBatchNo(), product.getProductId());
+                // Try to find and restore to existing variant in any batch
+                for (InventoryEntity batch : batches) {
+                    if (quantityToRestore <= 0) break;
+
+                    List<BatchVariant> variants = batch.getVariants();
+                    if (variants == null) continue;
+
+                    BatchVariant targetVariant = variants.stream()
+                            .filter(v -> {
+                                String variantSize = v.getSize();
+                                if (orderedSize == null || orderedSize.trim().isEmpty()) {
+                                    return variantSize == null || variantSize.trim().isEmpty();
+                                }
+                                return orderedSize.equalsIgnoreCase(variantSize);
+                            })
+                            .findFirst()
+                            .orElse(null);
+
+                    if (targetVariant != null) {
+                        targetVariant.setQuantity(targetVariant.getQuantity() + quantityToRestore);
+                        quantityToRestore = 0;
+                        restored = true;
+
+                        logger.info("Restored {} to batch {} variant size '{}' (parent ID: {})",
+                                item.getQuantity(), batch.getBatchNo(), targetVariant.getSize(),
+                                product != null ? product.getProductId() : mbp.getId());
                     }
                 }
 
-                productRepository.save(product);
+                // If no matching variant found → create new return batch with variant
+                if (quantityToRestore > 0) {
+                    InventoryEntity returnBatch = new InventoryEntity();
+                    returnBatch.setBatchNo("RETURN-" + orderId + "-" + item.getOrderItemId());
+                    returnBatch.setStockStatus("AVAILABLE");
+                    returnBatch.setLastUpdated(LocalDateTime.now());
+
+                    BatchVariant returnVariant = new BatchVariant();
+                    returnVariant.setSize(orderedSize);
+                    returnVariant.setQuantity(quantityToRestore);
+                    returnVariant.setMfgDate("N/A");
+                    returnVariant.setExpDate("N/A");
+
+                    returnBatch.getVariants().add(returnVariant);
+
+                    if (product != null) {
+                        returnBatch.setProduct(product);
+                        product.getInventoryBatches().add(returnBatch);
+                    } else {
+                        returnBatch.setMbp(mbp);
+                        mbp.getInventoryBatches().add(returnBatch);
+                    }
+
+                    logger.info("Created return batch for size '{}' with {} units (order item {})",
+                            orderedSize, quantityToRestore, item.getOrderItemId());
+                }
+
+                // Save parent
+                if (product != null) {
+                    productRepository.save(product);
+                } else if (mbp != null) {
+                    mbpRepository.save(mbp);
+                }
             }
         }
 
-//        if (orderEntity.getOrderItems() != null) {
-//
-//            for (OrderItemEntity item : orderEntity.getOrderItems()) {
-//                if (item.getProduct() != null) {
-//
-//                    ProductEntity product = item.getProduct();
-//                    Integer currentStockQuantity = product.getProductQuantity();
-//                    Integer restoredStock = currentStockQuantity + item.getQuantity();
-//                    product.setProductQuantity(restoredStock);
-//
-//                    productRepository.save(product);
-//                    logger.info("Restored {} units to product ID: {}. New stock: {}",
-//                            item.getQuantity(), product.getProductId(), restoredStock);
-//                }
-//            }
-//        }
-
-        // Update order status to CANCELLED
         orderEntity.setOrderStatus("CANCELLED");
         OrderEntity cancelledOrder = orderRepository.save(orderEntity);
 
         logger.info("Order cancelled successfully with ID: {}", orderId);
         return mapToResponseDto(cancelledOrder);
     }
-
-
-
-
 }

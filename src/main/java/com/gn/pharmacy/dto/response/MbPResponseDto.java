@@ -3,6 +3,7 @@ package com.gn.pharmacy.dto.response;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class MbPResponseDto {
     private Long id;
@@ -32,6 +33,9 @@ public class MbPResponseDto {
     private Boolean deleted;
 
     private Boolean approved;
+
+
+    private Map<String, Integer> stockBySize;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -125,5 +129,14 @@ public class MbPResponseDto {
 
     public void setDeleted(Boolean deleted) {
         this.deleted = deleted;
+    }
+
+
+    public Map<String, Integer> getStockBySize() {
+        return stockBySize;
+    }
+
+    public void setStockBySize(Map<String, Integer> stockBySize) {
+        this.stockBySize = stockBySize;
     }
 }

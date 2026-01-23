@@ -16,6 +16,7 @@ import java.util.Map;
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
+
     @Autowired
     private InventoryService inventoryService;
 

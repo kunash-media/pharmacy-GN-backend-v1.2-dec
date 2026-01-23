@@ -1,21 +1,24 @@
 package com.gn.pharmacy.service.serviceImpl;
 
-
 import com.gn.pharmacy.dto.request.ProductPatchDto;
 import com.gn.pharmacy.dto.request.ProductRequestDto;
-import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
 import com.gn.pharmacy.dto.response.ProductResponseDto;
+import com.gn.pharmacy.entity.BatchVariant;
 import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.ProductEntity;
+import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.repository.InventoryRepository;
 import com.gn.pharmacy.repository.ProductRepository;
 import com.gn.pharmacy.service.InventoryService;
 import com.gn.pharmacy.service.ProductService;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,18 +45,19 @@ public class ProductServiceImpl implements ProductService {
     private InventoryService inventoryService;
 
     @Autowired
-    private InventoryRepository inventoryRepository ;
+    private InventoryRepository inventoryRepository;
 
     public ProductServiceImpl(ProductRepository productRepository) {
         this.productRepository = productRepository;
     }
 
     @Override
+    @Transactional
     public ProductResponseDto createProduct(ProductRequestDto requestDto) throws Exception {
         logger.debug("Creating new product with name: {}", requestDto.getProductName());
 
-        // === ADD VALIDATION HERE ===
-        validateProductData(requestDto, true);  // true = isCreate
+        // Updated validation - checks per-size maps
+        validateProductData(requestDto, true);
 
         // Check if SKU already exists
         if (requestDto.getSku() != null && !requestDto.getSku().trim().isEmpty()) {
@@ -78,14 +82,8 @@ public class ProductServiceImpl implements ProductService {
         entity.setProductStock(requestDto.getProductStock());
         entity.setProductStatus(requestDto.getProductStatus());
         entity.setProductDescription(requestDto.getProductDescription());
-//        entity.setProductQuantity(requestDto.getProductQuantity());
-
-        // Set new fields
         entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
         entity.setBrandName(requestDto.getBrandName());
-//        entity.setMfgDate(requestDto.getMfgDate());
-//        entity.setExpDate(requestDto.getExpDate());
-//        entity.setBatchNo(requestDto.getBatchNo());
         entity.setRating(requestDto.getRating());
         entity.setBenefitsList(requestDto.getBenefitsList() != null ? requestDto.getBenefitsList() : new ArrayList<>());
         entity.setIngredientsList(requestDto.getIngredientsList() != null ? requestDto.getIngredientsList() : new ArrayList<>());
@@ -134,21 +132,52 @@ public class ProductServiceImpl implements ProductService {
             entity.setProductSizes(new ArrayList<>());
         }
 
-        // Set created date
         entity.setCreatedAt(LocalDateTime.now());
 
         ProductEntity savedEntity = productRepository.save(entity);
 
-        // ==============  Automatically add initial inventory batch  =============
-
+        // ============== Automatically add initial inventory batch with variants =============
         BatchInfoDTO batchInfo = new BatchInfoDTO();
         batchInfo.setProductId(savedEntity.getProductId());
-        batchInfo.setBatchNo(requestDto.getBatchNo());  // Optional, as per your note
-        batchInfo.setQuantity(requestDto.getProductQuantity());
-        batchInfo.setMfgDate(requestDto.getMfgDate());  // Optional
-        batchInfo.setExpiryDate(requestDto.getExpDate());  // Optional
-        inventoryService.addStockBatch(batchInfo);
+        batchInfo.setBatchNo(requestDto.getBatchNo() != null && !requestDto.getBatchNo().trim().isEmpty()
+                ? requestDto.getBatchNo()
+                : "INIT-PROD-" + savedEntity.getProductId());
 
+        List<BatchInfoDTO.VariantDTO> variants = new ArrayList<>();
+
+        List<String> sizes = savedEntity.getProductSizes();
+        if (sizes != null && !sizes.isEmpty()) {
+            // Preferred: per-size variants from DTO maps
+            if (requestDto.getSizeQuantities() != null && !requestDto.getSizeQuantities().isEmpty()) {
+                for (String size : sizes) {
+                    Integer qty = requestDto.getSizeQuantities().getOrDefault(size, 0);
+                    String mfg = (requestDto.getSizeMfgDates() != null) ? requestDto.getSizeMfgDates().getOrDefault(size, null) : null;
+                    String exp = (requestDto.getSizeExpDates() != null) ? requestDto.getSizeExpDates().getOrDefault(size, null) : null;
+
+                    if (qty > 0) {
+                        variants.add(new BatchInfoDTO.VariantDTO(size, qty, mfg, exp));
+                    }
+                }
+            }
+        }
+
+        // Fallback: single variant if no sizes or no per-size qty
+        if (variants.isEmpty() && requestDto.getProductQuantity() != null && requestDto.getProductQuantity() > 0) {
+            variants.add(new BatchInfoDTO.VariantDTO(
+                    null, // no size
+                    requestDto.getProductQuantity(),
+                    requestDto.getMfgDate(),
+                    requestDto.getExpDate()
+            ));
+        }
+
+        if (!variants.isEmpty()) {
+            batchInfo.setVariants(variants);
+            inventoryService.addStockBatch(batchInfo);
+            logger.info("Created batch with {} variants for Product {}", variants.size(), savedEntity.getProductId());
+        } else {
+            logger.warn("No initial stock added for Product {} - no quantity provided", savedEntity.getProductId());
+        }
 
         logger.debug("Product saved with ID: {}", savedEntity.getProductId());
         return mapToResponseDto(savedEntity);
@@ -174,7 +203,6 @@ public class ProductServiceImpl implements ProductService {
         return productPage.map(this::mapToResponseDto);
     }
 
-    //==============  NEW GET ALL NON-DELETED INCLUDED ONLY =================//
     @Override
     @Transactional(readOnly = true)
     public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
@@ -191,7 +219,6 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductResponseDto> getAllProducts() {
         try {
             List<ProductEntity> entities = productRepository.findAllActive();
-            // Use stream to map each entity using mapToResponseDto
             return entities.stream()
                     .map(this::mapToResponseDto)
                     .collect(Collectors.toList());
@@ -199,8 +226,6 @@ public class ProductServiceImpl implements ProductService {
             throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
         }
     }
-
-    //========================== END =========================================//
 
     @Override
     public List<ProductResponseDto> getProductsByCategory(String category) {
@@ -238,10 +263,8 @@ public class ProductServiceImpl implements ProductService {
                     return new IllegalArgumentException("Product not found with ID: " + id);
                 });
 
-        // === ADD VALIDATION HERE (main image not required on update) ===
-        validateProductData(requestDto, false);  // false = not create
+        validateProductData(requestDto, false);
 
-        // Update fields
         entity.setSku(requestDto.getSku());
         entity.setProductName(requestDto.getProductName());
         entity.setProductCategory(requestDto.getProductCategory());
@@ -251,12 +274,8 @@ public class ProductServiceImpl implements ProductService {
         entity.setProductStock(requestDto.getProductStock());
         entity.setProductStatus(requestDto.getProductStatus());
         entity.setProductDescription(requestDto.getProductDescription());
-//        entity.setProductQuantity(requestDto.getProductQuantity());
         entity.setPrescriptionRequired(requestDto.isPrescriptionRequired());
         entity.setBrandName(requestDto.getBrandName());
-//        entity.setMfgDate(requestDto.getMfgDate());
-//        entity.setExpDate(requestDto.getExpDate());
-//        entity.setBatchNo(requestDto.getBatchNo());
         entity.setRating(requestDto.getRating());
 
         if (requestDto.getBenefitsList() != null) {
@@ -269,19 +288,16 @@ public class ProductServiceImpl implements ProductService {
             entity.setDirectionsList(requestDto.getDirectionsList());
         }
 
-        // Update category path
         if (requestDto.getCategoryPath() != null) {
             entity.setCategoryPath(requestDto.getCategoryPath());
         } else if (requestDto.getProductSubCategory() != null) {
             entity.setCategoryPath(buildCategoryPath(requestDto.getProductSubCategory()));
         }
 
-        // Update main image if provided
         if (requestDto.getProductMainImage() != null && !requestDto.getProductMainImage().isEmpty()) {
             entity.setProductMainImage(requestDto.getProductMainImage().getBytes());
         }
 
-        // Update sub images if provided
         if (requestDto.getProductSubImages() != null) {
             List<byte[]> subImages = requestDto.getProductSubImages().stream()
                     .filter(file -> file != null && !file.isEmpty())
@@ -296,12 +312,10 @@ public class ProductServiceImpl implements ProductService {
             entity.setProductSubImages(subImages);
         }
 
-        // Update dynamic fields
         if (requestDto.getProductDynamicFields() != null) {
             entity.setProductDynamicFields(requestDto.getProductDynamicFields());
         }
 
-        // Update sizes
         if (requestDto.getProductSizes() != null) {
             entity.setProductSizes(requestDto.getProductSizes());
         }
@@ -310,7 +324,6 @@ public class ProductServiceImpl implements ProductService {
         logger.debug("Product updated successfully with ID: {}", id);
         return mapToResponseDto(updatedEntity);
     }
-
 
     @Override
     @Transactional
@@ -325,7 +338,7 @@ public class ProductServiceImpl implements ProductService {
         ProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
 
-        // ==================== PATCH SCALAR FIELDS ====================
+        // PATCH SCALAR FIELDS
         if (patchDto.getSku() != null) entity.setSku(patchDto.getSku());
         if (patchDto.getProductName() != null) entity.setProductName(patchDto.getProductName());
         if (patchDto.getProductCategory() != null) entity.setProductCategory(patchDto.getProductCategory());
@@ -337,12 +350,6 @@ public class ProductServiceImpl implements ProductService {
         if (patchDto.getProductStatus() != null) entity.setProductStatus(patchDto.getProductStatus());
         if (patchDto.getProductDescription() != null) entity.setProductDescription(patchDto.getProductDescription());
 
-//        if (patchDto.getProductQuantity() != null) entity.setProductQuantity(patchDto.getProductQuantity());
-//        if (patchDto.getBrandName() != null) entity.setBrandName(patchDto.getBrandName());
-//        if (patchDto.getMfgDate() != null) entity.setMfgDate(patchDto.getMfgDate());
-//        if (patchDto.getExpDate() != null) entity.setExpDate(patchDto.getExpDate());
-//        if (patchDto.getBatchNo() != null) entity.setBatchNo(patchDto.getBatchNo());
-
         if (patchDto.getRating() != null) entity.setRating(patchDto.getRating());
 
         // Boolean fields - only update if explicitly set
@@ -353,8 +360,7 @@ public class ProductServiceImpl implements ProductService {
             entity.setPrescriptionRequired(patchDto.getPrescriptionRequired());
         }
 
-        // ==================== PATCH LIST FIELDS (SAFE) ====================
-        // Only update if non-null AND non-empty → prevents accidental clearing
+        // PATCH LIST FIELDS (safe - only if non-null and non-empty)
         if (patchDto.getProductPrice() != null && !patchDto.getProductPrice().isEmpty()) {
             entity.setProductPrice(patchDto.getProductPrice());
         }
@@ -380,7 +386,7 @@ public class ProductServiceImpl implements ProductService {
             entity.setProductDynamicFields(patchDto.getProductDynamicFields());
         }
 
-        // ==================== PATCH IMAGES ====================
+        // PATCH IMAGES
         if (productMainImage != null && !productMainImage.isEmpty()) {
             entity.setProductMainImage(productMainImage.getBytes());
         }
@@ -398,50 +404,32 @@ public class ProductServiceImpl implements ProductService {
                     .collect(Collectors.toList());
             entity.setProductSubImages(subImages);
         }
-        // If no images sent → preserve existing ones
 
-        // Save and return
         ProductEntity updatedEntity = productRepository.save(entity);
         logger.debug("Product patched successfully with ID: {}", id);
 
         return mapToResponseDto(updatedEntity);
     }
 
-
-
-
-    // NEW VALIDATION ADDED METHOD
     private void validateProductData(ProductRequestDto dto, boolean isCreate) {
-        // Product name - required
         if (dto.getProductName() == null || dto.getProductName().trim().isEmpty()) {
             throw new IllegalArgumentException("Product name is required");
         }
 
-        // At least one price is required
         if (dto.getProductPrice() == null || dto.getProductPrice().isEmpty()) {
             throw new IllegalArgumentException("At least one product price is required");
         }
 
-        // All prices must be positive and non-null
-        for (BigDecimal price : dto.getProductPrice()) {
-            if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("All product prices must be greater than zero");
-            }
+        if (dto.getProductPrice().stream().anyMatch(price -> price == null || price.compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new IllegalArgumentException("All product prices must be greater than zero");
         }
 
-        // Quantity - must be non-null and non-negative
-        if (dto.getProductQuantity() == null || dto.getProductQuantity() < 0) {
-            throw new IllegalArgumentException("Product quantity must be zero or positive");
+        // Main image required only on create
+        if (isCreate && (dto.getProductMainImage() == null || dto.getProductMainImage().isEmpty())) {
+            throw new IllegalArgumentException("Product main image is required when creating a product");
         }
 
-        // Main image - required only on create (optional on update/patch)
-        if (isCreate) {
-            if (dto.getProductMainImage() == null || dto.getProductMainImage().isEmpty()) {
-                throw new IllegalArgumentException("Product main image is required when creating a product");
-            }
-        }
-
-        // Sizes and prices consistency (if sizes provided)
+        // Sizes and prices consistency
         List<String> sizes = dto.getProductSizes();
         List<BigDecimal> prices = dto.getProductPrice();
         List<BigDecimal> oldPrices = dto.getProductOldPrice();
@@ -454,7 +442,7 @@ public class ProductServiceImpl implements ProductService {
                 throw new IllegalArgumentException("Number of old prices must match number of sizes");
             }
 
-            // Optional: validate old prices > current prices where provided
+            // Validate old > current where provided
             if (oldPrices != null) {
                 for (int i = 0; i < prices.size(); i++) {
                     BigDecimal current = prices.get(i);
@@ -463,6 +451,31 @@ public class ProductServiceImpl implements ProductService {
                         throw new IllegalArgumentException("Old price must be greater than current price for size: " + sizes.get(i));
                     }
                 }
+            }
+
+            // NEW: Validate per-size data if sizes exist
+            if (dto.getSizeQuantities() == null || dto.getSizeQuantities().size() != sizes.size()) {
+                throw new IllegalArgumentException("sizeQuantities must have an entry for every size");
+            }
+            // mfg/exp are optional → no strict size check, but log if missing
+            if (dto.getSizeMfgDates() != null && dto.getSizeMfgDates().size() != sizes.size()) {
+                logger.warn("sizeMfgDates provided but size mismatch - some dates may be missing");
+            }
+            if (dto.getSizeExpDates() != null && dto.getSizeExpDates().size() != sizes.size()) {
+                logger.warn("sizeExpDates provided but size mismatch - some dates may be missing");
+            }
+
+            // Check qty non-negative
+            for (String size : sizes) {
+                Integer qty = dto.getSizeQuantities().get(size);
+                if (qty == null || qty < 0) {
+                    throw new IllegalArgumentException("Quantity for size " + size + " must be non-negative");
+                }
+            }
+        } else {
+            // No sizes → require single quantity
+            if (dto.getProductQuantity() == null || dto.getProductQuantity() < 0) {
+                throw new IllegalArgumentException("Product quantity must be non-negative when no sizes are provided");
             }
         }
     }
@@ -499,15 +512,10 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
-
-
-    //=================== bulk product handling api ======================//
-
     @Override
     public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
         logger.debug("Starting bulk product creation from Excel");
 
-        // ================= 1. MAP IMAGES =================
         Map<String, MultipartFile> imageMap = new HashMap<>();
         if (images != null) {
             for (MultipartFile image : images) {
@@ -531,8 +539,7 @@ public class ProductServiceImpl implements ProductService {
             Sheet sheet = workbook.getSheetAt(0);
             Iterator<Row> rowIterator = sheet.iterator();
 
-            // Skip header row
-            if (rowIterator.hasNext()) rowIterator.next();
+            if (rowIterator.hasNext()) rowIterator.next(); // Skip header
 
             while (rowIterator.hasNext()) {
                 Row row = rowIterator.next();
@@ -552,13 +559,12 @@ public class ProductServiceImpl implements ProductService {
 
                 ProductRequestDto dto = new ProductRequestDto();
 
-                // ================= 2. BASIC FIELDS =================
                 dto.setProductName(productName);
                 dto.setProductCategory(getCellValue(row.getCell(1)));
                 dto.setProductSubCategory(getCellValue(row.getCell(2)));
                 dto.setSku(getCellValue(row.getCell(21)));
 
-                // ================= 3. PRICES =================
+                // Prices
                 List<BigDecimal> prices = new ArrayList<>();
                 String priceStr = getCellValue(row.getCell(3)).trim();
                 if (priceStr.isEmpty()) {
@@ -568,11 +574,8 @@ public class ProductServiceImpl implements ProductService {
                 }
                 try {
                     for (String p : priceStr.split(",")) {
-                        // trim and remove invisible/non-breaking spaces
-                        String cleanPrice = p.trim().replace("\u00A0", "");
-                        if (!cleanPrice.isEmpty()) {
-                            prices.add(new BigDecimal(cleanPrice));
-                        }
+                        String clean = p.trim().replace("\u00A0", "");
+                        if (!clean.isEmpty()) prices.add(new BigDecimal(clean));
                     }
                 } catch (Exception e) {
                     skippedCount++;
@@ -581,69 +584,58 @@ public class ProductServiceImpl implements ProductService {
                 }
                 dto.setProductPrice(prices);
 
-                // ================= 4. OLD PRICES =================
+                // Old prices (optional)
                 List<BigDecimal> oldPrices = new ArrayList<>();
                 String oldPriceStr = getCellValue(row.getCell(4));
                 if (!oldPriceStr.isEmpty()) {
                     try {
                         for (String p : oldPriceStr.split(",")) {
-                            String cleanOld = p.trim().replace("\u00A0", "");
-                            if (!cleanOld.isEmpty()) {
-                                oldPrices.add(new BigDecimal(cleanOld));
-                            }
+                            String clean = p.trim().replace("\u00A0", "");
+                            if (!clean.isEmpty()) oldPrices.add(new BigDecimal(clean));
                         }
-                    } catch (Exception e) {
-                        oldPrices = new ArrayList<>();
+                    } catch (Exception ignored) {
+                        // Ignore invalid old prices
                     }
                 }
                 dto.setProductOldPrice(oldPrices);
 
-                // ================= 5. SIZES =================
+                // Sizes
                 List<String> sizes = new ArrayList<>();
                 String sizeStr = getCellValue(row.getCell(12));
                 if (!sizeStr.isEmpty()) {
                     sizes = Arrays.stream(sizeStr.split(","))
                             .map(String::trim)
-                            .map(s -> s.replace("\u00A0", "")) // remove non-breaking spaces
+                            .map(s -> s.replace("\u00A0", ""))
                             .filter(s -> !s.isEmpty())
                             .collect(Collectors.toList());
                 }
                 dto.setProductSizes(sizes);
 
-                // ================= 6. AUTO-APPLY SINGLE PRICE TO MULTIPLE SIZES =================
+                // Auto-apply single price to all sizes
                 if (sizes.size() > 1 && prices.size() == 1) {
-                    BigDecimal singlePrice = prices.get(0);
+                    BigDecimal single = prices.get(0);
                     prices = new ArrayList<>();
-                    for (int i = 0; i < sizes.size(); i++) {
-                        prices.add(singlePrice);
-                    }
+                    for (int i = 0; i < sizes.size(); i++) prices.add(single);
                     dto.setProductPrice(prices);
 
-                    // Similarly handle oldPrices if only one value exists
                     if (oldPrices.size() == 1) {
                         BigDecimal singleOld = oldPrices.get(0);
                         oldPrices = new ArrayList<>();
-                        for (int i = 0; i < sizes.size(); i++) {
-                            oldPrices.add(singleOld);
-                        }
+                        for (int i = 0; i < sizes.size(); i++) oldPrices.add(singleOld);
                         dto.setProductOldPrice(oldPrices);
                     }
                 }
 
-                // ================= 7. VALIDATE SIZE-PRICE MAPPING =================
+                // Validate size-price mapping
                 try {
                     validateSizePriceMapping(sizes, prices, oldPrices, productName);
                 } catch (IllegalArgumentException e) {
                     skippedCount++;
                     skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
-                    continue; // skip this product
+                    continue;
                 }
 
-                // Optional debug log
-                logger.debug("Product: {}, Sizes: {}, Prices: {}, OldPrices: {}",
-                        productName, sizes, prices, oldPrices);
-
-                // ================= 8. QUANTITY =================
+                // Quantity (fallback)
                 Integer quantity = getIntegerCellValue(row.getCell(8));
                 if (quantity == null) {
                     skippedCount++;
@@ -652,7 +644,7 @@ public class ProductServiceImpl implements ProductService {
                 }
                 dto.setProductQuantity(quantity);
 
-                // ================= 9. MAIN IMAGE =================
+                // Main image
                 String mainImageName = getCellValue(row.getCell(9)).trim();
                 if (!mainImageName.isEmpty()) {
                     MultipartFile mainImage = imageMap.get(mainImageName.toLowerCase());
@@ -665,7 +657,7 @@ public class ProductServiceImpl implements ProductService {
                     }
                 }
 
-                // ================= 10. SUB IMAGES =================
+                // Sub images
                 String subImagesStr = getCellValue(row.getCell(10));
                 List<MultipartFile> subImages = new ArrayList<>();
                 if (!subImagesStr.isEmpty()) {
@@ -685,7 +677,7 @@ public class ProductServiceImpl implements ProductService {
                 }
                 dto.setProductSubImages(subImages);
 
-                // ================= 11. DYNAMIC FIELDS =================
+                // Dynamic fields
                 Map<String, String> dynamicFields = new HashMap<>();
                 String dynamicStr = getCellValue(row.getCell(11));
                 if (!dynamicStr.isEmpty()) {
@@ -696,33 +688,34 @@ public class ProductServiceImpl implements ProductService {
                 }
                 dto.setProductDynamicFields(dynamicFields);
 
-                // ================= 12. MEDICAL & BRAND INFO =================
+                // Medical & brand
                 dto.setPrescriptionRequired(Boolean.TRUE.equals(getBooleanCellValue(row.getCell(13))));
                 dto.setBrandName(getCellValue(row.getCell(14)));
+
+                // Per-size data (if Excel supports it - extend columns as needed)
+                // For now, fallback to single quantity - extend later if needed
+                // dto.setSizeQuantities(...); // parse from additional columns
+
                 dto.setMfgDate(getCellValue(row.getCell(15)));
                 dto.setExpDate(getCellValue(row.getCell(16)));
                 dto.setBatchNo(getCellValue(row.getCell(17)));
 
-                // ================= 13. LIST FIELDS =================
                 dto.setBenefitsList(parseCommaList(row.getCell(18)));
                 dto.setDirectionsList(parseCommaList(row.getCell(19)));
                 dto.setIngredientsList(parseCommaList(row.getCell(20)));
 
-                // ================= 14. CREATE PRODUCT =================
                 try {
-                    createProduct(dto); // your existing service method
+                    createProduct(dto);
                     uploadedCount++;
                 } catch (Exception e) {
                     skippedCount++;
                     skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
                 }
             }
-
         } catch (Exception e) {
             throw new RuntimeException("Bulk upload failed: " + e.getMessage(), e);
         }
 
-        // ================= 15. RETURN RESPONSE =================
         BulkUploadResponse response = new BulkUploadResponse();
         response.setUploadedCount(uploadedCount);
         response.setSkippedCount(skippedCount);
@@ -730,50 +723,28 @@ public class ProductServiceImpl implements ProductService {
         return response;
     }
 
-
-
-
-
-    // ================= Helper: Parse comma-separated list =================
+    // Helpers (unchanged)
     private List<String> parseCommaList(Cell cell) {
         String value = getCellValue(cell);
-        if (value == null || value.trim().isEmpty()) {
-            return new ArrayList<>();
-        }
+        if (value == null || value.trim().isEmpty()) return new ArrayList<>();
         return Arrays.stream(value.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
     }
 
-
-    // ================= Helper: Validate size-price mapping =================
-    private void validateSizePriceMapping(
-            List<String> sizes,
-            List<BigDecimal> prices,
-            List<BigDecimal> oldPrices,
-            String productName
-    ) {
-
+    private void validateSizePriceMapping(List<String> sizes, List<BigDecimal> prices,
+                                          List<BigDecimal> oldPrices, String productName) {
         if (sizes != null && !sizes.isEmpty()) {
-
             if (prices == null || sizes.size() != prices.size()) {
-                throw new IllegalArgumentException(
-                        "Sizes count must match price count for product: " + productName
-                );
+                throw new IllegalArgumentException("Sizes count must match price count for product: " + productName);
             }
-
-            if (oldPrices != null && !oldPrices.isEmpty()
-                    && oldPrices.size() != prices.size()) {
-                throw new IllegalArgumentException(
-                        "Old price count must match price count for product: " + productName
-                );
+            if (oldPrices != null && !oldPrices.isEmpty() && oldPrices.size() != prices.size()) {
+                throw new IllegalArgumentException("Old price count must match price count for product: " + productName);
             }
         }
     }
 
-
-    // Helper method: Safe integer parsing (handles Excel numeric as double)
     private Integer getIntegerCellValue(Cell cell) {
         if (cell == null) return null;
         try {
@@ -784,12 +755,9 @@ public class ProductServiceImpl implements ProductService {
                     return Integer.parseInt(strVal);
                 case NUMERIC:
                     double numVal = cell.getNumericCellValue();
-                    if (numVal == Math.floor(numVal)) {  // Check if whole number
-                        return (int) numVal;
-                    } else {
-                        logger.warn("Non-integer numeric value found: {}", numVal);
-                        return null;  // Or (int) Math.floor(numVal) if you want to truncate
-                    }
+                    if (numVal == Math.floor(numVal)) return (int) numVal;
+                    logger.warn("Non-integer numeric value found: {}", numVal);
+                    return null;
                 case BOOLEAN:
                     return cell.getBooleanCellValue() ? 1 : 0;
                 default:
@@ -801,7 +769,6 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    // NEW HELPER: For boolean parsing (handles "true"/"false", "yes"/"no", 1/0)
     private Boolean getBooleanCellValue(Cell cell) {
         if (cell == null) return null;
         try {
@@ -828,143 +795,86 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    // Helper method: For strings and decimals (trimmed)
     private String getCellValue(Cell cell) {
         if (cell == null) return "";
         switch (cell.getCellType()) {
-            case STRING: return cell.getStringCellValue().trim();
-            case NUMERIC: return String.valueOf(cell.getNumericCellValue());
-            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
-            default: return "";
+            case STRING:
+                return cell.getStringCellValue().trim();
+            case NUMERIC:
+                return String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            default:
+                return "";
         }
     }
 
     private List<String> buildCategoryPath(String subCategory) {
-        if (subCategory == null || subCategory.trim().isEmpty()) {
-            return new ArrayList<>();
-        }
+        if (subCategory == null || subCategory.trim().isEmpty()) return new ArrayList<>();
         return Arrays.stream(subCategory.split(">"))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
     }
 
-//    private ProductResponseDto mapToResponseDto(ProductEntity entity) {
-//        ProductResponseDto responseDto = new ProductResponseDto();
-//
-//        responseDto.setApproved(entity.isApproved());
-//        responseDto.setDeleted(entity.isDeleted());
-//        responseDto.setProductId(entity.getProductId());
-//        responseDto.setSku(entity.getSku());
-//        responseDto.setProductName(entity.getProductName());
-//        responseDto.setProductCategory(entity.getProductCategory());
-//        responseDto.setProductSubCategory(entity.getProductSubCategory());
-//        responseDto.setProductPrice(entity.getProductPrice());
-//        responseDto.setProductOldPrice(entity.getProductOldPrice());
-//        responseDto.setProductStock(entity.getProductStock());
-//        responseDto.setProductStatus(entity.getProductStatus());
-//        responseDto.setProductDescription(entity.getProductDescription());
-//        responseDto.setCreatedAt(entity.getCreatedAt());
-////        responseDto.setProductQuantity(entity.getProductQuantity());
-//        responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
-//        responseDto.setBrandName(entity.getBrandName());
-////        responseDto.setMfgDate(entity.getMfgDate());
-////        responseDto.setExpDate(entity.getExpDate());
-////        responseDto.setBatchNo(entity.getBatchNo());
-//        responseDto.setRating(entity.getRating());
-//        responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
-//        responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
-//        responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
-//        responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
-//
-//        // Set image URLs
-//        if (entity.getProductMainImage() != null) {
-//            responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
-//        }
-//
-//        if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
-//            List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
-//                    .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
-//                    .collect(Collectors.toList());
-//            responseDto.setProductSubImages(subImageUrls);
-//        }
-//
-//        responseDto.setProductDynamicFields(entity.getProductDynamicFields());
-//        responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
-//
-//        return responseDto;
-//    }
+    private ProductResponseDto mapToResponseDto(ProductEntity entity) {
+        ProductResponseDto responseDto = new ProductResponseDto();
 
+        responseDto.setApproved(entity.isApproved());
+        responseDto.setDeleted(entity.isDeleted());
+        responseDto.setProductId(entity.getProductId());
+        responseDto.setSku(entity.getSku());
+        responseDto.setProductName(entity.getProductName());
+        responseDto.setProductCategory(entity.getProductCategory());
+        responseDto.setProductSubCategory(entity.getProductSubCategory());
+        responseDto.setProductPrice(entity.getProductPrice());
+        responseDto.setProductOldPrice(entity.getProductOldPrice());
+        responseDto.setProductStock(entity.getProductStock());
+        responseDto.setProductStatus(entity.getProductStatus());
+        responseDto.setProductDescription(entity.getProductDescription());
+        responseDto.setCreatedAt(entity.getCreatedAt());
+        responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
+        responseDto.setBrandName(entity.getBrandName());
+        responseDto.setRating(entity.getRating());
+        responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
+        responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
+        responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
+        responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
 
-private ProductResponseDto mapToResponseDto(ProductEntity entity) {
-    ProductResponseDto responseDto = new ProductResponseDto();
+        // Stock by size (from variants across all batches)
+        Map<String, Integer> stockBySize = new HashMap<>();
+        int totalQuantity = 0;
 
-    responseDto.setApproved(entity.isApproved());
-    responseDto.setDeleted(entity.isDeleted());
-    responseDto.setProductId(entity.getProductId());
-    responseDto.setSku(entity.getSku());
-    responseDto.setProductName(entity.getProductName());
-    responseDto.setProductCategory(entity.getProductCategory());
-    responseDto.setProductSubCategory(entity.getProductSubCategory());
-    responseDto.setProductPrice(entity.getProductPrice());
-    responseDto.setProductOldPrice(entity.getProductOldPrice());
-    responseDto.setProductStock(entity.getProductStock());
-    responseDto.setProductStatus(entity.getProductStatus());
-    responseDto.setProductDescription(entity.getProductDescription());
-    responseDto.setCreatedAt(entity.getCreatedAt());
-    responseDto.setPrescriptionRequired(entity.isPrescriptionRequired());
-    responseDto.setBrandName(entity.getBrandName());
-    responseDto.setRating(entity.getRating());
-    responseDto.setBenefitsList(entity.getBenefitsList() != null ? entity.getBenefitsList() : new ArrayList<>());
-    responseDto.setIngredientsList(entity.getIngredientsList() != null ? entity.getIngredientsList() : new ArrayList<>());
-    responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
-    responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
+        List<InventoryEntity> inventories = inventoryRepository.findByProduct(entity);
+        for (InventoryEntity inv : inventories) {
+            if (inv.getVariants() != null) {
+                for (BatchVariant v : inv.getVariants()) {
+                    String sizeKey = v.getSize() != null ? v.getSize() : "DEFAULT";
+                    int qty = v.getQuantity() != null ? v.getQuantity() : 0;
+                    stockBySize.merge(sizeKey, qty, Integer::sum);
+                    totalQuantity += qty;
+                }
+            }
+        }
 
-    // Set image URLs
-    if (entity.getProductMainImage() != null) {
-        responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
-    }
-
-    if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
-        List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
-                .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
-                .collect(Collectors.toList());
-        responseDto.setProductSubImages(subImageUrls);
-    }
-
-    responseDto.setProductDynamicFields(entity.getProductDynamicFields());
-    responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
-
-    // ==================== ADD THIS BLOCK HERE ====================
-    // Fetch total quantity from all batches
-    List<InventoryEntity> inventories = inventoryRepository.findByProduct(entity);
-
-    if (!inventories.isEmpty()) {
-        int totalQuantity = inventories.stream()
-                .mapToInt(InventoryEntity::getQuantity)
-                .sum();
+        responseDto.setStockBySize(stockBySize);
         responseDto.setProductQuantity(totalQuantity);
 
-        // Fetch only the latest batch for batchNo, mfgDate, expDate (optimized)
-        Optional<InventoryEntity> latestOpt = inventoryRepository
-                .findFirstByProductOrderByLastUpdatedDesc(entity);
+        // Images
+        if (entity.getProductMainImage() != null) {
+            responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
+        }
 
-        latestOpt.ifPresent(latest -> {
-            responseDto.setBatchNo(latest.getBatchNo());
-            responseDto.setMfgDate(latest.getMfgDate());
-            responseDto.setExpDate(latest.getExpDate());
-        });
-    } else {
-        // No inventory yet
-        responseDto.setProductQuantity(0);
-        responseDto.setBatchNo(null);
-        responseDto.setMfgDate(null);
-        responseDto.setExpDate(null);
+        if (entity.getProductSubImages() != null && !entity.getProductSubImages().isEmpty()) {
+            List<String> subImageUrls = IntStream.range(0, entity.getProductSubImages().size())
+                    .mapToObj(i -> "/api/products/" + entity.getProductId() + "/subimage/" + i)
+                    .collect(Collectors.toList());
+            responseDto.setProductSubImages(subImageUrls);
+        }
+
+        responseDto.setProductDynamicFields(entity.getProductDynamicFields());
+        responseDto.setProductSizes(entity.getProductSizes() != null ? entity.getProductSizes() : new ArrayList<>());
+
+        return responseDto;
     }
-    // ===========================================================
-
-    return responseDto;
-}
-
-
 }

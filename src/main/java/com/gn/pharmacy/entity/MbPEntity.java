@@ -105,7 +105,7 @@ public class MbPEntity {
     // Helper method to get total quantity from all batches (mirrors ProductEntity)
     public Integer getTotalCalculatedStock() {
         return inventoryBatches.stream()
-                .mapToInt(InventoryEntity::getQuantity)
+                .mapToInt(InventoryEntity::getTotalQuantity)
                 .sum();
     }
 

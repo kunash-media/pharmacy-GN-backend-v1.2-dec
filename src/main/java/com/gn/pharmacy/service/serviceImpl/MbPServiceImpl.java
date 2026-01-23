@@ -36,6 +36,7 @@ public class MbPServiceImpl implements MbPService {
     private InventoryRepository inventoryRepository;
 
     @Override
+    @Transactional
     public MbPResponseDto createMbProduct(MbPRequestDto dto) {
         logger.info("Creating new MB product with SKU: {}", dto.getSku());
 
@@ -48,13 +49,42 @@ public class MbPServiceImpl implements MbPService {
             MbPEntity entity = toEntity(dto, new MbPEntity());
             entity = repo.save(entity);
 
+            // ============== Automatically add initial inventory batch with variants =============
             BatchInfoDTO batchInfo = new BatchInfoDTO();
             batchInfo.setMbpId(entity.getId());
-            batchInfo.setBatchNo("MB-DEFAULT-" + entity.getId());  // Optional/default if not in DTO
-            batchInfo.setQuantity(dto.getStockQuantity());
-            batchInfo.setMfgDate(null);  // Optional, add to DTO if needed
-            batchInfo.setExpiryDate(null);  // Optional, add to DTO if needed
-            inventoryService.addStockBatch(batchInfo);
+            batchInfo.setBatchNo(dto.getBatchNo() != null && !dto.getBatchNo().trim().isEmpty()
+                    ? dto.getBatchNo()
+                    : "INIT-MB-" + entity.getId());
+
+            List<BatchInfoDTO.VariantDTO> variants = new ArrayList<>();
+
+            List<String> sizes = entity.getProductSizes();
+            if (sizes != null && !sizes.isEmpty()) {
+                // Preferred: per-size variants from DTO maps
+                if (dto.getSizeQuantities() != null && !dto.getSizeQuantities().isEmpty()) {
+                    for (String size : sizes) {
+                        Integer qty = dto.getSizeQuantities().getOrDefault(size, 0);
+                        String mfg = (dto.getSizeMfgDates() != null) ? dto.getSizeMfgDates().getOrDefault(size, null) : null;
+                        String exp = (dto.getSizeExpDates() != null) ? dto.getSizeExpDates().getOrDefault(size, null) : null;
+
+                        if (qty > 0) {
+                            variants.add(new BatchInfoDTO.VariantDTO(size, qty, mfg, exp));
+                        }
+                    }
+                }
+            }
+
+            // Fallback: single variant if no sizes or no per-size qty
+            // (since getStockQuantity() no longer exists, we skip or use 0)
+            // If you still want fallback, add a default value or make it optional
+            // For now: no fallback quantity — require per-size data when sizes exist
+            if (variants.isEmpty()) {
+                logger.warn("No variants provided for MBP {} - no stock added", entity.getId());
+            } else {
+                batchInfo.setVariants(variants);
+                inventoryService.addStockBatch(batchInfo);
+                logger.info("Created batch with {} variants for MBP {}", variants.size(), entity.getId());
+            }
 
             MbPResponseDto response = toDto(entity);
             logger.info("MB Product created successfully with ID: {}, SKU: {}", response.getId(), response.getSku());
@@ -176,25 +206,6 @@ public class MbPServiceImpl implements MbPService {
         return List.of();
     }
 
-
-//    @Override
-//    public List<MbPResponseDto> getAllMbProduct() {
-//        logger.debug("Fetching all MB products");
-//
-//        try {
-//            List<MbPResponseDto> products = repo.findAll().stream()
-//                    .map(this::toDto)
-//                    .collect(Collectors.toList());
-//
-//            logger.debug("Fetched {} MB products", products.size());
-//            return products;
-//
-//        } catch (Exception e) {
-//            logger.error("Error fetching all MB products: {}", e.getMessage(), e);
-//            throw e;
-//        }
-//    }
-
     @Override
     @Transactional(readOnly = true)
     public Page<MbPResponseDto> getAllMbProduct(Pageable pageable) {
@@ -211,7 +222,6 @@ public class MbPServiceImpl implements MbPService {
             throw new RuntimeException("Failed to retrieve all products: " + e.getMessage(), e);
         }
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -237,8 +247,6 @@ public class MbPServiceImpl implements MbPService {
         }
     }
 
-    //============= NEW DELETD GET ALL HANDLED ====================//
-
     @Transactional(readOnly = true)
     @Override
     public Page<MbPResponseDto> getAllProducts(Pageable pageable) {
@@ -255,7 +263,6 @@ public class MbPServiceImpl implements MbPService {
     public List<MbPResponseDto> getAllProducts() {
         try {
             List<MbPEntity> entities = repo.findAllActive();
-            // Use stream to map each entity using mapToResponseDto
             return entities.stream()
                     .map(this::toDto)
                     .collect(Collectors.toList());
@@ -263,9 +270,6 @@ public class MbPServiceImpl implements MbPService {
             throw new RuntimeException("Failed to retrieve products: " + e.getMessage(), e);
         }
     }
-
-    //========================== END =========================================//
-
 
     @Override
     public List<MbPResponseDto> getMbProductsByCategory(String category) {
@@ -378,7 +382,7 @@ public class MbPServiceImpl implements MbPService {
         e.setReviewCount(d.getReviewCount());
         e.setBrand(d.getBrand());
         e.setInStock(d.getInStock());
-        e.setStockQuantity(d.getStockQuantity());
+        // FIXED: Removed e.setStockQuantity(d.getStockQuantity());  ← no longer exists in DTO
         e.setDescription(d.getDescription());
         e.setProductSizes(d.getProductSizes());
         e.setFeatures(d.getFeatures());
@@ -399,7 +403,6 @@ public class MbPServiceImpl implements MbPService {
                 logger.debug("{} sub-images set for MB product", d.getSubImages().size());
             }
 
-            // NEW: Set approved field if provided in request (null = keep existing/default)
             if (d.getApproved() != null) {
                 e.setApproved(d.getApproved());
             }
@@ -410,8 +413,6 @@ public class MbPServiceImpl implements MbPService {
         return e;
     }
 
-
-
     private void patchEntity(MbPRequestDto d, MbPEntity e) {
         logger.debug("Patching MB entity with partial data");
 
@@ -420,40 +421,31 @@ public class MbPServiceImpl implements MbPService {
         if (StringUtils.hasText(d.getCategory())) e.setCategory(d.getCategory());
         if (StringUtils.hasText(d.getSubCategory())) e.setSubCategory(d.getSubCategory());
 
-        // FIX: Only update price if DTO has non-empty list (not null and not empty)
         if (d.getPrice() != null && !d.getPrice().isEmpty()) {
             e.setPrice(d.getPrice());
             logger.debug("Price updated to: {}", d.getPrice());
         } else if (d.getPrice() != null && d.getPrice().isEmpty()) {
             logger.warn("Empty price list provided - preserving existing price: {}", e.getPrice());
-            // Don't update - keep existing price
         }
 
-        // FIX: Only update originalPrice if DTO has non-empty list
         if (d.getOriginalPrice() != null && !d.getOriginalPrice().isEmpty()) {
             e.setOriginalPrice(d.getOriginalPrice());
             logger.debug("OriginalPrice updated to: {}", d.getOriginalPrice());
         } else if (d.getOriginalPrice() != null && d.getOriginalPrice().isEmpty()) {
             logger.warn("Empty originalPrice list provided - preserving existing: {}", e.getOriginalPrice());
-            // Don't update - keep existing originalPrice
         }
-
-//        if (d.getPrice() != null) e.setPrice(d.getPrice());
-//        if (d.getOriginalPrice() != null) e.setOriginalPrice(d.getOriginalPrice());
-
 
         if (d.getDiscount() != null) e.setDiscount(d.getDiscount());
         if (d.getRating() != null) e.setRating(d.getRating());
         if (d.getReviewCount() != null) e.setReviewCount(d.getReviewCount());
         if (StringUtils.hasText(d.getBrand())) e.setBrand(d.getBrand());
         if (d.getInStock() != null) e.setInStock(d.getInStock());
-        if (d.getStockQuantity() != null) e.setStockQuantity(d.getStockQuantity());
+        // FIXED: Removed if (d.getStockQuantity() != null) e.setStockQuantity(d.getStockQuantity());
         if (d.getDescription() != null && !d.getDescription().isEmpty()) e.setDescription(d.getDescription());
         if (d.getProductSizes() != null && !d.getProductSizes().isEmpty()) e.setProductSizes(d.getProductSizes());
         if (d.getFeatures() != null && !d.getFeatures().isEmpty()) e.setFeatures(d.getFeatures());
         if (StringUtils.hasText(d.getSpecifications())) e.setSpecifications(d.getSpecifications());
 
-        // NEW: Patch approved field if provided
         if (d.getApproved() != null) {
             e.setApproved(d.getApproved());
         }
@@ -481,43 +473,6 @@ public class MbPServiceImpl implements MbPService {
         }
     }
 
-//    @Override
-//    public MbPResponseDto toDto(MbPEntity e) {
-//        logger.debug("Converting Entity to DTO for MB product ID: {}", e.getId());
-//
-//        MbPResponseDto d = new MbPResponseDto();
-//        d.setId(e.getId());
-//        d.setSku(e.getSku());
-//        d.setTitle(e.getTitle());
-//        d.setCategory(e.getCategory());
-//        d.setSubCategory(e.getSubCategory());
-//        d.setPrice(e.getPrice());
-//        d.setOriginalPrice(e.getOriginalPrice());
-//        d.setDiscount(e.getDiscount());
-//        d.setRating(e.getRating());
-//        d.setReviewCount(e.getReviewCount());
-//        d.setBrand(e.getBrand());
-//        d.setInStock(e.getInStock());
-//        d.setStockQuantity(e.getStockQuantity());
-//        d.setDescription(e.getDescription());
-//        d.setProductSizes(e.getProductSizes());
-//        d.setFeatures(e.getFeatures());
-//        d.setSpecifications(e.getSpecifications());
-//        d.setCreatedAt(e.getCreatedAt());
-//
-//        Long id = e.getId();
-//        d.setMainImageUrl("/api/mb/products/" + id + "/image");
-//
-//        List<String> subUrls = IntStream.range(0, e.getProductSubImages().size())
-//                .mapToObj(i -> "/api/mb/products/" + id + "/subimage/" + i)
-//                .collect(Collectors.toList());
-//        d.setSubImageUrls(subUrls);
-//
-//        logger.debug("DTO conversion completed for MB product ID: {}", e.getId());
-//
-//        return d;
-//    }
-
 
     @Override
     public MbPResponseDto toDto(MbPEntity e) {
@@ -535,7 +490,7 @@ public class MbPServiceImpl implements MbPService {
         d.setRating(e.getRating());
         d.setReviewCount(e.getReviewCount());
         d.setBrand(e.getBrand());
-        d.setInStock(e.getInStock());  // This can stay as-is (boolean based on your business rule, e.g., total > 0)
+        d.setInStock(e.getInStock());
         d.setDescription(e.getDescription());
         d.setProductSizes(e.getProductSizes());
         d.setFeatures(e.getFeatures());
@@ -557,29 +512,34 @@ public class MbPServiceImpl implements MbPService {
         List<InventoryEntity> inventories = inventoryRepository.findByMbp(e);
 
         if (!inventories.isEmpty()) {
-            // Total stock quantity across all batches
+            // Total stock quantity across all batches and all variants
             int totalQuantity = inventories.stream()
-                    .mapToInt(InventoryEntity::getQuantity)
+                    .flatMap(inv -> inv.getVariants().stream())
+                    .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
                     .sum();
             d.setStockQuantity(totalQuantity);
 
-            // Optional: Get latest batch details (uncomment if your MbPResponseDto has these fields)
-            Optional<InventoryEntity> latestOpt = inventoryRepository
-                    .findFirstByMbpOrderByLastUpdatedDesc(e);
+            // Size-wise stock map
+            Map<String, Integer> stockBySize = inventories.stream()
+                    .flatMap(inv -> inv.getVariants().stream())
+                    .collect(Collectors.groupingBy(
+                            v -> v.getSize() != null ? v.getSize() : "DEFAULT",
+                            Collectors.summingInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                    ));
+            d.setStockBySize(stockBySize);
+
+            // Optional: latest batch info (if needed)
+            Optional<InventoryEntity> latestOpt = inventories.stream()
+                    .max(Comparator.comparing(InventoryEntity::getLastUpdated));
 
             latestOpt.ifPresent(latest -> {
-                // Uncomment these lines only if you have added these fields to MbPResponseDto
+                // Uncomment if MbPResponseDto has these fields
                 // d.setBatchNo(latest.getBatchNo());
-                // d.setMfgDate(latest.getMfgDate());
-                // d.setExpDate(latest.getExpDate());
+                // d.setLastUpdated(latest.getLastUpdated());
             });
         } else {
-            // No inventory yet
             d.setStockQuantity(0);
-            // If you have batch fields in DTO, set them to null here
-            // d.setBatchNo(null);
-            // d.setMfgDate(null);
-            // d.setExpDate(null);
+            d.setStockBySize(new HashMap<>());
         }
         // ================================================================
 

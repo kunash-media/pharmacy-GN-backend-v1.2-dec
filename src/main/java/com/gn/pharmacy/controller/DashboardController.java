@@ -41,7 +41,7 @@ public class DashboardController {
     }
 
     @GetMapping("/inventory/low-stock")
-    public ResponseEntity<ApiResponse<List<LowStockDto>>> getLowStock(@RequestParam(defaultValue = "10") int limit) {
+    public ResponseEntity<ApiResponse<List<LowStockDto>>> getLowStock(@RequestParam(defaultValue = "50") int limit) {
         return ResponseEntity.ok(ApiResponse.success(dashboardService.getLowStockItems(limit)));
     }
 

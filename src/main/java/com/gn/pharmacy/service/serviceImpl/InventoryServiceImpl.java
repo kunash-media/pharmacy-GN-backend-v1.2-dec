@@ -3,6 +3,7 @@ package com.gn.pharmacy.service.serviceImpl;
 import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.dto.response.BatchWithProductDTO;
 import com.gn.pharmacy.dto.response.ProductAdminResponseDTO;
+import com.gn.pharmacy.entity.BatchVariant;
 import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.MbPEntity;
 import com.gn.pharmacy.entity.ProductEntity;
@@ -18,6 +19,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,12 +33,11 @@ public class InventoryServiceImpl implements InventoryService {
     private ProductRepository productRepository;
 
     @Autowired
-    private MbPRepository mbpRepository;  // Make sure this exists
+    private MbPRepository mbpRepository;
 
     @Autowired
     private InventoryRepository inventoryRepository;
 
-    // Backward compatibility - only ProductEntity
     @Override
     public void addStockBatchToProduct(Long productId, BatchInfoDTO batchInfo) {
         ProductEntity product = productRepository.findById(productId)
@@ -44,14 +46,26 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryEntity inventory = new InventoryEntity();
         inventory.setProduct(product);
         inventory.setBatchNo(batchInfo.getBatchNo());
-        inventory.setQuantity(batchInfo.getQuantity());
-        inventory.setMfgDate(batchInfo.getMfgDate());
-        inventory.setExpDate(batchInfo.getExpiryDate());
 
+        // Require variants list (modern flow only)
+        if (batchInfo.getVariants() == null || batchInfo.getVariants().isEmpty()) {
+            throw new IllegalArgumentException("Variants list is required when adding stock batch. No legacy single fields supported.");
+        }
+
+        List<BatchVariant> entityVariants = batchInfo.getVariants().stream()
+                .map(v -> new BatchVariant(
+                        v.getSize(),
+                        v.getQuantity(),
+                        v.getMfgDate(),
+                        v.getExpiryDate()
+                ))
+                .collect(Collectors.toList());
+
+        inventory.setVariants(entityVariants);
+        inventory.setStockStatus("AVAILABLE");
         inventoryRepository.save(inventory);
     }
 
-    // Unified add batch - supports both ProductEntity and MbPEntity
     @Override
     public void addStockBatch(BatchInfoDTO batchInfo) {
         if ((batchInfo.getProductId() == null && batchInfo.getMbpId() == null) ||
@@ -72,11 +86,23 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         inventory.setBatchNo(batchInfo.getBatchNo());
-        inventory.setQuantity(batchInfo.getQuantity());
-        inventory.setMfgDate(batchInfo.getMfgDate());
-        inventory.setExpDate(batchInfo.getExpiryDate());
-        // stockStatus can be set to default if needed, e.g., "AVAILABLE"
 
+        // Require variants list (modern flow only)
+        if (batchInfo.getVariants() == null || batchInfo.getVariants().isEmpty()) {
+            throw new IllegalArgumentException("Variants list is required when adding stock batch. No legacy single fields supported.");
+        }
+
+        List<BatchVariant> entityVariants = batchInfo.getVariants().stream()
+                .map(v -> new BatchVariant(
+                        v.getSize(),
+                        v.getQuantity(),
+                        v.getMfgDate(),
+                        v.getExpiryDate()
+                ))
+                .collect(Collectors.toList());
+
+        inventory.setVariants(entityVariants);
+        inventory.setStockStatus("AVAILABLE");
         inventoryRepository.save(inventory);
     }
 
@@ -94,20 +120,41 @@ public class InventoryServiceImpl implements InventoryService {
         response.setBrandName(product.getBrandName());
 
         List<BatchInfoDTO> batchDTOs = batches.stream()
-                .map(batch -> new BatchInfoDTO(
-                        batch.getInventoryId(),
-                        batch.getBatchNo(),
-                        batch.getQuantity(),
-                        batch.getMfgDate(),
-                        batch.getExpDate(),
-                        batch.getStockStatus(),
-                        batch.getLastUpdated()
-                ))
+                .map(batch -> {
+                    BatchInfoDTO dto = new BatchInfoDTO();
+                    dto.setInventoryId(batch.getInventoryId());
+                    dto.setBatchNo(batch.getBatchNo());
+                    dto.setStockStatus(batch.getStockStatus());
+                    dto.setLastUpdated(batch.getLastUpdated());
+
+                    if (batch.getVariants() != null && !batch.getVariants().isEmpty()) {
+                        List<BatchInfoDTO.VariantDTO> variantDtos = batch.getVariants().stream()
+                                .map(v -> new BatchInfoDTO.VariantDTO(
+                                        v.getSize(),
+                                        v.getQuantity(),
+                                        v.getMfgDate(),
+                                        v.getExpDate()
+                                ))
+                                .collect(Collectors.toList());
+                        dto.setVariants(variantDtos);
+
+                        // Calculate and set total
+                        int batchTotal = batch.getVariants().stream()
+                                .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                                .sum();
+                        dto.setTotalQuantity(batchTotal);
+                    } else {
+                        dto.setVariants(new ArrayList<>());
+                        dto.setTotalQuantity(0);
+                    }
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         response.setBatches(batchDTOs);
 
-        int totalStock = batchDTOs.stream().mapToInt(BatchInfoDTO::getQuantity).sum();
+        int totalStock = batchDTOs.stream().mapToInt(BatchInfoDTO::getTotalQuantity).sum();
         response.setTotalStock(totalStock);
 
         return response;
@@ -129,18 +176,19 @@ public class InventoryServiceImpl implements InventoryService {
             inventoryPage = inventoryRepository.findAll(pageable);
         }
 
-        // Calculate total stock per parent item (product or mbp)
+        // Total stock per parent (sum of all variants across all batches)
         Map<Long, Integer> totalStockMap = inventoryPage.getContent().stream()
                 .collect(Collectors.groupingBy(
                         inv -> inv.getProduct() != null ? inv.getProduct().getProductId() : inv.getMbp().getId(),
-                        Collectors.summingInt(InventoryEntity::getQuantity)
+                        Collectors.summingInt(inv -> inv.getVariants().stream()
+                                .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                                .sum())
                 ));
 
         return inventoryPage.map(inventory -> {
             ProductEntity prod = inventory.getProduct();
             MbPEntity mbp = inventory.getMbp();
 
-            // Defensive check: exactly one of product or mbp should be present
             if (prod == null && mbp == null) {
                 throw new IllegalStateException("Inventory entity must have either a product or an MBP.");
             }
@@ -151,26 +199,30 @@ public class InventoryServiceImpl implements InventoryService {
             Long itemId = prod != null ? prod.getProductId() : mbp.getId();
             String itemName = prod != null ? prod.getProductName() : mbp.getTitle();
             String sku = prod != null ? prod.getSku() : mbp.getSku();
-            String brandName = prod != null
-                    ? prod.getBrandName()
-                    : (mbp.getBrand() != null ? mbp.getBrand() : "N/A");
+            String brandName = prod != null ? prod.getBrandName() : (mbp.getBrand() != null ? mbp.getBrand() : "N/A");
 
             Integer totalStock = totalStockMap.getOrDefault(itemId, 0);
+
+            // Batch total from its own variants
+            int batchTotal = inventory.getVariants().stream()
+                    .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                    .sum();
 
             return new BatchWithProductDTO(
                     inventory.getInventoryId(),
                     inventory.getBatchNo(),
-                    inventory.getQuantity(),
-                    inventory.getMfgDate(),
-                    inventory.getExpDate(),
+                    batchTotal,
+                    null,   // no batch-level mfgDate
+                    null,   // no batch-level expDate
                     inventory.getStockStatus(),
                     inventory.getLastUpdated(),
-                    prod != null ? prod.getProductId() : null,  // Safe: null if no product
-                    mbp != null ? mbp.getId() : null,          // Safe: null if no mbp
+                    prod != null ? prod.getProductId() : null,
+                    mbp != null ? mbp.getId() : null,
                     itemName,
                     sku,
                     brandName,
-                    totalStock
+                    totalStock,
+                    null    // no batch-level size
             );
         });
     }
@@ -181,23 +233,29 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryEntity inventory = inventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new RuntimeException("Batch not found with ID: " + inventoryId));
 
+        // Update batch-level fields if provided
         if (batchUpdate.getBatchNo() != null && !batchUpdate.getBatchNo().trim().isEmpty()) {
             inventory.setBatchNo(batchUpdate.getBatchNo().trim());
         }
-        if (batchUpdate.getQuantity() != null) {
-            inventory.setQuantity(batchUpdate.getQuantity());
-        }
-        if (batchUpdate.getMfgDate() != null && !batchUpdate.getMfgDate().trim().isEmpty()) {
-            inventory.setMfgDate(batchUpdate.getMfgDate().trim());
-        }
-        if (batchUpdate.getExpiryDate() != null && !batchUpdate.getExpiryDate().trim().isEmpty()) {
-            inventory.setExpDate(batchUpdate.getExpiryDate().trim());
-        }
+
         if (batchUpdate.getStockStatus() != null && !batchUpdate.getStockStatus().trim().isEmpty()) {
             inventory.setStockStatus(batchUpdate.getStockStatus().trim());
         }
 
-        inventoryRepository.save(inventory); // lastUpdated auto-updated
+        // Replace entire variants list if provided (standard PATCH for collections)
+        if (batchUpdate.getVariants() != null) {
+            List<BatchVariant> newVariants = batchUpdate.getVariants().stream()
+                    .map(v -> new BatchVariant(
+                            v.getSize(),
+                            v.getQuantity(),
+                            v.getMfgDate(),
+                            v.getExpiryDate()
+                    ))
+                    .collect(Collectors.toList());
+            inventory.setVariants(newVariants);
+        }
+
+        inventoryRepository.save(inventory);
     }
 
     @Override

@@ -28,7 +28,6 @@ public class DashboardServiceImpl implements DashboardService {
     private final PrescriptionRepository prescriptionRepository;
     private final InventoryRepository inventoryRepository;
 
-
     public DashboardServiceImpl(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
                                 ProductRepository productRepository, MbPRepository mbpRepository, PrescriptionRepository prescriptionRepository, InventoryRepository inventoryRepository) {
         this.orderRepository = orderRepository;
@@ -51,8 +50,11 @@ public class DashboardServiceImpl implements DashboardService {
                         .mapToLong(m -> Optional.ofNullable(m.getTotalCalculatedStock()).orElse(0))
                         .sum();
 
+        // FIXED: Use variant sum instead of getQuantity()
         long lowStockItems = inventoryRepository.findAll().stream()
-                .filter(batch -> batch.getQuantity() < 20)
+                .filter(batch -> batch.getVariants().stream()
+                        .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                        .sum() < 20)
                 .count();
 
         YearMonth current = YearMonth.now();
@@ -118,29 +120,25 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<LowStockDto> getLowStockItems(int limit) {
         return inventoryRepository.findAll().stream()
-                .filter(b -> b.getQuantity() < 30)
-                .sorted(Comparator.comparingInt(InventoryEntity::getQuantity))
+                // FIXED: Use variant sum instead of getQuantity()
+                .filter(b -> b.getVariants().stream()
+                        .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                        .sum() < 30)
+                .sorted(Comparator.comparingInt(b -> b.getVariants().stream()
+                        .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                        .sum()))
                 .limit(limit)
                 .map(b -> {
                     String name = b.getProduct() != null ? b.getProduct().getProductName() : b.getMbp() != null ? b.getMbp().getTitle() : "Unknown";
                     String sku = b.getProduct() != null ? b.getProduct().getSku() : b.getMbp() != null ? b.getMbp().getSku() : "";
-                    String level = b.getQuantity() == 0 ? "Out" : b.getQuantity() < 10 ? "Critical" : "Low";
-                    return new LowStockDto(name, sku, b.getQuantity(), level);
+                    int totalQty = b.getVariants().stream()
+                            .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                            .sum();
+                    String level = totalQty == 0 ? "Out" : totalQty < 10 ? "Critical" : "Low";
+                    return new LowStockDto(name, sku, totalQty, level);
                 })
                 .toList();
     }
-
-//    @Override
-//    public List<TopSellingDto> getTopSellingProducts(int limit, int months) {
-//        LocalDateTime from = LocalDateTime.now().minusMonths(months);
-//        return orderItemRepository.findTopSelling(from, PageRequest.of(0, limit)).stream()
-//                .map(row -> {
-//                    Object[] arr = (Object[]) row;
-//                    return new TopSellingDto((String) arr[0], (Long) arr[1], (BigDecimal) arr[2]);
-//                })
-//                .toList();
-//    }
-
 
     @Override
     public List<TopSellingDto> getTopSellingProducts(int limit, int months) {
@@ -168,7 +166,10 @@ public class DashboardServiceImpl implements DashboardService {
         long w30 = 0, w60 = 0, w90 = 0;
 
         for (InventoryEntity b : batches) {
-            String expStr = b.getExpDate();
+            // FIXED: Check expiry from variants (use first variant or any)
+            String expStr = b.getVariants().isEmpty() ? null :
+                    b.getVariants().get(0).getExpDate(); // or aggregate if needed
+
             if (expStr == null || expStr.trim().isEmpty()) continue;
 
             LocalDate expDate = parseDate(expStr.trim());
@@ -200,11 +201,10 @@ public class DashboardServiceImpl implements DashboardService {
         return new ExpirySummaryDto(w30, w60, w90, items);
     }
 
-    // Helper method inside the class
+    // Helper method inside the class (unchanged)
     private LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.isEmpty()) return null;
 
-        // Try common formats
         String[] formats = {"yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy", "MM/dd/yyyy", "yyyy/MM/dd"};
         for (String format : formats) {
             try {

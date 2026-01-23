@@ -145,21 +145,6 @@ public class MbPController {
         }
     }
 
-//    @GetMapping("/get-all")
-//    public ResponseEntity<List<MbPResponseDto>> getAllMbProduct() {
-//        logger.info("Fetching all MB products");
-//
-//        try {
-//            List<MbPResponseDto> products = mbpService.getAllMbProduct();
-//            logger.info("Retrieved {} MB products", products.size());
-//            return ResponseEntity.ok(products);
-//
-//        } catch (Exception e) {
-//            logger.error("Error retrieving MB products: {}", e.getMessage(), e);
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-//        }
-//    }
-
 
     @GetMapping("/get-all")
     public ResponseEntity<Page<MbPResponseDto>> getAllMbProduct(
@@ -213,25 +198,6 @@ public class MbPController {
         return Sort.unsorted();
     }
 
-
-
-//    @GetMapping("/get-all-mb-active-products")
-//    public ResponseEntity<List<MbPResponseDto>> getAllProducts(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size,
-//            @RequestParam(defaultValue = "100") long delayMillis) {
-//        try {
-//            // Add delay to simulate controlled response rate
-//            Thread.sleep(delayMillis);
-//
-//            Pageable pageable = PageRequest.of(page, size);
-//            Page<MbPResponseDto> productPage = mbpService.getAllProducts(pageable);
-//
-//            return new ResponseEntity<>(productPage.getContent(), HttpStatus.OK);
-//        } catch (Exception e) {
-//            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
-//        }
-//    }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MbPResponseDto> updateMbProduct(

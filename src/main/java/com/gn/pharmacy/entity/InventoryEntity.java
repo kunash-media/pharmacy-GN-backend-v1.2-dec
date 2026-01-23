@@ -1,68 +1,63 @@
 package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
-
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "product_inventory")
 public class InventoryEntity {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long inventoryId;
 
-    // Link back to your existing Product
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = true)
     private ProductEntity product;
-
-    @Column(name = "batch_no", nullable = true)
-    private String batchNo;
-
-    @Column(name = "mfg_date")
-    private String mfgDate;
-
-    @Column(name = "exp_date")
-    private String expDate;
-
-    @Column(name = "quantity")
-    private Integer quantity;
-
-    @Column(name = "stock_status") // e.g., "AVAILABLE", "EXPIRED", "DAMAGED"
-    private String stockStatus;
-
-    @Column(name = "last_updated")
-    private LocalDateTime lastUpdated;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mbp_id", nullable = true)
     private MbPEntity mbp;
 
+    @Column(name = "batch_no", nullable = true)
+    private String batchNo;
+
+    @Column(name = "stock_status")
+    private String stockStatus;
+
+    @Column(name = "last_updated")
+    private LocalDateTime lastUpdated;
+
+    // ────────────── NEW: Replace single size/quantity with collection ──────────────
+    @ElementCollection
+    @CollectionTable(name = "inventory_variants", joinColumns = @JoinColumn(name = "inventory_id"))
+    private List<BatchVariant> variants = new ArrayList<>();
 
     @PrePersist
     @PreUpdate
     protected void onUpdate() {
         lastUpdated = LocalDateTime.now();
     }
+     // Helper: total quantity
+    public int getTotalQuantity() {
+        return variants.stream().mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0).sum();
+    }
+
+
 
     // Constructors,
 
     public InventoryEntity(){}
 
-    public InventoryEntity(Long inventoryId, ProductEntity product, String batchNo,
-                           String mfgDate, String expDate, Integer quantity,
-                           String stockStatus, LocalDateTime lastUpdated, MbPEntity mbp) {
+    public InventoryEntity(Long inventoryId, ProductEntity product, MbPEntity mbp, String batchNo, String stockStatus, LocalDateTime lastUpdated, List<BatchVariant> variants) {
         this.inventoryId = inventoryId;
         this.product = product;
+        this.mbp = mbp;
         this.batchNo = batchNo;
-        this.mfgDate = mfgDate;
-        this.expDate = expDate;
-        this.quantity = quantity;
         this.stockStatus = stockStatus;
         this.lastUpdated = lastUpdated;
-        this.mbp = mbp;
+        this.variants = variants;
     }
 
 
@@ -92,29 +87,6 @@ public class InventoryEntity {
         this.batchNo = batchNo;
     }
 
-    public String getMfgDate() {
-        return mfgDate;
-    }
-
-    public void setMfgDate(String mfgDate) {
-        this.mfgDate = mfgDate;
-    }
-
-    public String getExpDate() {
-        return expDate;
-    }
-
-    public void setExpDate(String expDate) {
-        this.expDate = expDate;
-    }
-
-    public Integer getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
-    }
 
     public String getStockStatus() {
         return stockStatus;
@@ -139,4 +111,15 @@ public class InventoryEntity {
     public void setMbp(MbPEntity mbp) {
         this.mbp = mbp;
     }
+
+
+    public List<BatchVariant> getVariants() {
+        return variants;
+    }
+
+    public void setVariants(List<BatchVariant> variants) {
+        this.variants = variants;
+    }
 }
+
+

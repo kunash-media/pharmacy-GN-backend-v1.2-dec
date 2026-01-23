@@ -13,6 +13,7 @@ public class OrderItemDto {
     private Double subtotal;
     private String itemName;
 
+    private String size;
 
 
     // ADD THIS FIELD
@@ -93,5 +94,14 @@ public class OrderItemDto {
 
     public void setProductMainImage(String productMainImage) {
         this.productMainImage = productMainImage;
+    }
+
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
     }
 }

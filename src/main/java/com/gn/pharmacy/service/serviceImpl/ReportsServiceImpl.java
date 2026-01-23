@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,7 +30,9 @@ public class ReportsServiceImpl implements ReportsService {
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    public ReportsServiceImpl(ProductRepository productRepository, MbPRepository mbPRepository, InventoryRepository inventoryRepository, OrderItemRepository orderItemRepository, OrderRepository orderRepository) {
+    public ReportsServiceImpl(ProductRepository productRepository, MbPRepository mbPRepository,
+                              InventoryRepository inventoryRepository, OrderItemRepository orderItemRepository,
+                              OrderRepository orderRepository) {
         this.productRepository = productRepository;
         this.mbPRepository = mbPRepository;
         this.inventoryRepository = inventoryRepository;
@@ -57,25 +61,32 @@ public class ReportsServiceImpl implements ReportsService {
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by("order.orderDate").descending());
 
         Specification<OrderItemEntity> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
             if (fromStr != null && !fromStr.isEmpty() && toStr != null && !toStr.isEmpty()) {
-                return cb.between(root.get("order").get("orderDate"), fromStr, toStr);
+                try {
+                    Date from = dateFormat.parse(fromStr);
+                    Date to = dateFormat.parse(toStr);
+                    predicates.add(cb.between(root.get("order").get("orderDate"), from, to));
+                } catch (ParseException ignored) {}
             }
-            return cb.conjunction();
+
+            if (category != null && !category.isEmpty()) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("product").get("productCategory"), category),
+                        cb.equal(root.get("mbP").get("category"), category)
+                ));
+            }
+
+            if (subcategory != null && !subcategory.isEmpty()) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("product").get("productSubCategory"), subcategory),
+                        cb.equal(root.get("mbP").get("subCategory"), subcategory)
+                ));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
-
-        if (category != null && !category.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.equal(root.get("product").get("productCategory"), category),
-                    cb.equal(root.get("mbP").get("category"), category)
-            ));
-        }
-
-        if (subcategory != null && !subcategory.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.equal(root.get("product").get("productSubCategory"), subcategory),
-                    cb.equal(root.get("mbP").get("subCategory"), subcategory)
-            ));
-        }
 
         Page<OrderItemEntity> pageResult = orderItemRepository.findAll(spec, pageable);
 
@@ -95,18 +106,17 @@ public class ReportsServiceImpl implements ReportsService {
                     cat,
                     sub,
                     item.getQuantity(),
-                    item.getSubtotal(),
+                    item.getSubtotal() != null ? item.getSubtotal() : 0.0,
                     item.getOrder().getOrderDate(),
                     item.getOrder().getOrderStatus(),
                     custName.trim().isEmpty() ? "Anonymous" : custName.trim()
             );
         }).collect(Collectors.toList());
 
-        // Full summaries
         List<OrderItemEntity> allMatching = orderItemRepository.findAll(spec);
 
         BigDecimal totalRevenue = allMatching.stream()
-                .map(item -> item.getSubtotal() != null ? BigDecimal.valueOf(item.getSubtotal()) : BigDecimal.ZERO)
+                .map(item -> item.getSubtotal() != null ? new BigDecimal(item.getSubtotal().toString()) : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         String topProduct = allMatching.stream()
@@ -119,7 +129,10 @@ public class ReportsServiceImpl implements ReportsService {
                 .map(Map.Entry::getKey)
                 .orElse("N/A");
 
-        long totalOrders = allMatching.size();
+        long totalOrders = allMatching.stream()
+                .map(OrderItemEntity::getOrder)
+                .distinct()
+                .count();
 
         BigDecimal totalProfit = totalRevenue.multiply(new BigDecimal("0.25"));
 
@@ -135,31 +148,29 @@ public class ReportsServiceImpl implements ReportsService {
         );
     }
 
-
-
     @Override
     public PagedInventoryReportDto getInventoryReport(String fromStr, String toStr, String category, String subcategory, boolean lowStockOnly, int page, int limit) {
         Pageable pageable = PageRequest.of(page - 1, limit, Sort.by("lastUpdated").descending());
 
-        Specification<InventoryEntity> spec = (root, query, cb) -> cb.conjunction();
+        Specification<InventoryEntity> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
 
-        if (category != null && !category.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.equal(root.get("product").get("productCategory"), category),
-                    cb.equal(root.get("mbp").get("category"), category)
-            ));
-        }
+            if (category != null && !category.isEmpty()) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("product").get("productCategory"), category),
+                        cb.equal(root.get("mbp").get("category"), category)
+                ));
+            }
 
-        if (subcategory != null && !subcategory.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.equal(root.get("product").get("productSubCategory"), subcategory),
-                    cb.equal(root.get("mbp").get("subCategory"), subcategory)
-            ));
-        }
+            if (subcategory != null && !subcategory.isEmpty()) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("product").get("productSubCategory"), subcategory),
+                        cb.equal(root.get("mbp").get("subCategory"), subcategory)
+                ));
+            }
 
-        if (lowStockOnly) {
-            spec = spec.and((root, query, cb) -> cb.lessThan(root.get("quantity"), 10));
-        }
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
 
         Page<InventoryEntity> pageResult = inventoryRepository.findAll(spec, pageable);
 
@@ -171,12 +182,16 @@ public class ReportsServiceImpl implements ReportsService {
             String sub = item.getProduct() != null ? item.getProduct().getProductSubCategory() :
                     (item.getMbp() != null ? item.getMbp().getSubCategory() : "Unknown");
 
-            Integer totalStock = item.getProduct() != null ? item.getProduct().getTotalCalculatedStock() :
-                    (item.getMbp() != null ? item.getMbp().getTotalCalculatedStock() : item.getQuantity());
+            int totalStock = item.getVariants().stream()
+                    .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                    .sum();
 
             BigDecimal price = item.getProduct() != null && !item.getProduct().getProductPrice().isEmpty() ?
                     item.getProduct().getProductPrice().get(0) : new BigDecimal("100");
             BigDecimal stockValue = new BigDecimal(totalStock).multiply(price);
+
+            String expiry = item.getVariants().isEmpty() ? null :
+                    item.getVariants().get(0).getExpDate();
 
             return new InventoryReportItemDto(
                     item.getInventoryId(),
@@ -185,7 +200,7 @@ public class ReportsServiceImpl implements ReportsService {
                     sub,
                     totalStock,
                     stockValue,
-                    item.getExpDate(),
+                    expiry,
                     item.getBatchNo(),
                     item.getStockStatus()
             );
@@ -196,23 +211,30 @@ public class ReportsServiceImpl implements ReportsService {
         BigDecimal totalStockValue = BigDecimal.ZERO;
         long lowStockCount = 0;
         long expiringSoonCount = 0;
-        for (InventoryEntity i : allMatching) {
-            Integer qty = i.getProduct() != null ? i.getProduct().getTotalCalculatedStock() :
-                    (i.getMbp() != null ? i.getMbp().getTotalCalculatedStock() : i.getQuantity());
-            BigDecimal price = i.getProduct() != null && !i.getProduct().getProductPrice().isEmpty() ?
-                    i.getProduct().getProductPrice().get(0) : new BigDecimal("100");
-            totalStockValue = totalStockValue.add(new BigDecimal(qty).multiply(price));
 
-            if (i.getQuantity() < 10) lowStockCount++;
+        for (InventoryEntity inv : allMatching) {
+            int totalQty = inv.getVariants().stream()
+                    .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                    .sum();
 
-            if (i.getExpDate() != null) {
-                try {
-                    Date exp = dateFormat.parse(i.getExpDate());
-                    if (exp.before(new Date(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000))) {
-                        expiringSoonCount++;
-                    }
-                } catch (Exception ignored) {}
-            }
+            BigDecimal price = inv.getProduct() != null && !inv.getProduct().getProductPrice().isEmpty() ?
+                    inv.getProduct().getProductPrice().get(0) : new BigDecimal("100");
+            totalStockValue = totalStockValue.add(new BigDecimal(totalQty).multiply(price));
+
+            if (totalQty < 10) lowStockCount++;
+
+            boolean expiring = inv.getVariants().stream()
+                    .anyMatch(v -> {
+                        String exp = v.getExpDate();
+                        if (exp == null || exp.trim().isEmpty()) return false;
+                        try {
+                            Date expDate = dateFormat.parse(exp);
+                            return expDate.before(new Date(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000));
+                        } catch (ParseException e) {
+                            return false;
+                        }
+                    });
+            if (expiring) expiringSoonCount++;
         }
 
         long totalProducts = allMatching.size();
@@ -235,6 +257,14 @@ public class ReportsServiceImpl implements ReportsService {
 
         Specification<OrderEntity> spec = (root, query, cb) -> cb.conjunction();
 
+        if (fromStr != null && !fromStr.isEmpty() && toStr != null && !toStr.isEmpty()) {
+            try {
+                Date from = dateFormat.parse(fromStr);
+                Date to = dateFormat.parse(toStr);
+                spec = spec.and((root, q, c) -> c.between(root.get("orderDate"), from, to));
+            } catch (ParseException ignored) {}
+        }
+
         Page<OrderEntity> ordersPage = orderRepository.findAll(spec, pageable);
 
         Map<String, List<OrderEntity>> customerOrders = ordersPage.getContent().stream()
@@ -254,7 +284,7 @@ public class ReportsServiceImpl implements ReportsService {
             for (OrderEntity o : orders) {
                 for (OrderItemEntity i : o.getOrderItems()) {
                     if (i.getSubtotal() != null) {
-                        totalRevenue = totalRevenue.add(BigDecimal.valueOf(i.getSubtotal()));
+                        totalRevenue = totalRevenue.add(new BigDecimal(i.getSubtotal().toString()));
                     }
                 }
             }
@@ -264,24 +294,22 @@ public class ReportsServiceImpl implements ReportsService {
                         try {
                             return dateFormat.parse(o.getOrderDate());
                         } catch (ParseException e) {
-                            return new Date(0);
+                            return null;
                         }
                     })
+                    .filter(Objects::nonNull)
                     .max(Comparator.naturalOrder())
-                    .orElse(new Date());
+                    .orElse(null);
 
-            String topCategory = "N/A";
-            Map<String, Long> catCount = new HashMap<>();
-            for (OrderEntity o : orders) {
-                for (OrderItemEntity i : o.getOrderItems()) {
-                    String cat = i.getProduct() != null ? i.getProduct().getProductCategory() :
-                            (i.getMbP() != null ? i.getMbP().getCategory() : "Unknown");
-                    catCount.put(cat, catCount.getOrDefault(cat, 0L) + 1);
-                }
-            }
-            if (!catCount.isEmpty()) {
-                topCategory = Collections.max(catCount.entrySet(), Map.Entry.comparingByValue()).getKey();
-            }
+            String topCategory = orders.stream()
+                    .flatMap(o -> o.getOrderItems().stream())
+                    .map(i -> i.getProduct() != null ? i.getProduct().getProductCategory() :
+                            (i.getMbP() != null ? i.getMbP().getCategory() : "Unknown"))
+                    .collect(Collectors.groupingBy(c -> c, Collectors.counting()))
+                    .entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey)
+                    .orElse("N/A");
 
             items.add(new CustomerReportItemDto(
                     null,
@@ -300,13 +328,13 @@ public class ReportsServiceImpl implements ReportsService {
                 .map(Map.Entry::getKey)
                 .orElse("N/A");
 
+        // FIXED LINE: use record accessor totalRevenue() instead of getTotalRevenue()
+        BigDecimal totalRevenueAll = items.stream()
+                .map(item -> item.totalRevenue() != null ? item.totalRevenue() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         BigDecimal avgOrderValue = totalUnique > 0 ?
-                BigDecimal.valueOf(customerOrders.values().stream()
-                        .mapToDouble(list -> list.stream()
-                                .flatMap(o -> o.getOrderItems().stream())
-                                .mapToDouble(i -> i.getSubtotal() != null ? i.getSubtotal().doubleValue() : 0.0)
-                                .sum() / list.size())
-                        .average().orElse(0.0)) :
+                totalRevenueAll.divide(BigDecimal.valueOf(totalUnique), 2, BigDecimal.ROUND_HALF_UP) :
                 BigDecimal.ZERO;
 
         return new PagedCustomerReportDto(
@@ -322,13 +350,23 @@ public class ReportsServiceImpl implements ReportsService {
 
     @Override
     public FinancialSummaryDto getFinancialSummary(String fromStr, String toStr, String groupBy) {
-        List<OrderEntity> allOrders = orderRepository.findAll();
+        Specification<OrderEntity> spec = (root, query, cb) -> cb.conjunction();
+
+        if (fromStr != null && !fromStr.isEmpty() && toStr != null && !toStr.isEmpty()) {
+            try {
+                Date from = dateFormat.parse(fromStr);
+                Date to = dateFormat.parse(toStr);
+                spec = spec.and((root, q, c) -> c.between(root.get("orderDate"), from, to));
+            } catch (ParseException ignored) {}
+        }
+
+        List<OrderEntity> allOrders = orderRepository.findAll(spec);
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
         for (OrderEntity o : allOrders) {
             for (OrderItemEntity i : o.getOrderItems()) {
                 if (i.getSubtotal() != null) {
-                    totalRevenue = totalRevenue.add(BigDecimal.valueOf(i.getSubtotal()));
+                    totalRevenue = totalRevenue.add(new BigDecimal(i.getSubtotal().toString()));
                 }
             }
         }
@@ -336,15 +374,34 @@ public class ReportsServiceImpl implements ReportsService {
         BigDecimal totalExpenses = totalRevenue.multiply(new BigDecimal("0.75"));
         BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
         double profitMargin = totalRevenue.compareTo(BigDecimal.ZERO) > 0 ?
-                netProfit.divide(totalRevenue, 2, BigDecimal.ROUND_HALF_UP).doubleValue() * 100 : 0.0;
+                netProfit.divide(totalRevenue, 4, BigDecimal.ROUND_HALF_UP).doubleValue() * 100 : 0.0;
 
-        List<FinancialPeriodDto> breakdown = new ArrayList<>();
-        // Simple dummy monthly breakdown
-        for (int i = 1; i <= 12; i++) {
-            BigDecimal rev = totalRevenue.divide(new BigDecimal("12"), 2, BigDecimal.ROUND_HALF_UP);
-            BigDecimal exp = rev.multiply(new BigDecimal("0.75"));
-            breakdown.add(new FinancialPeriodDto("2025-" + String.format("%02d", i), rev, exp, rev.subtract(exp)));
-        }
+        Map<String, BigDecimal> monthlyRevenue = allOrders.stream()
+                .filter(o -> o.getOrderDate() != null)
+                .collect(Collectors.groupingBy(
+                        o -> {
+                            try {
+                                Date date = dateFormat.parse(o.getOrderDate());
+                                LocalDate localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                                return localDate.getYear() + "-" + String.format("%02d", localDate.getMonthValue());
+                            } catch (Exception e) {
+                                return "Unknown";
+                            }
+                        },
+                        Collectors.reducing(BigDecimal.ZERO,
+                                o -> o.getOrderItems().stream()
+                                        .map(i -> i.getSubtotal() != null ? new BigDecimal(i.getSubtotal().toString()) : BigDecimal.ZERO)
+                                        .reduce(BigDecimal.ZERO, BigDecimal::add),
+                                BigDecimal::add)
+                ));
+
+        List<FinancialPeriodDto> breakdown = monthlyRevenue.entrySet().stream()
+                .map(e -> {
+                    BigDecimal rev = e.getValue();
+                    BigDecimal exp = rev.multiply(new BigDecimal("0.75"));
+                    return new FinancialPeriodDto(e.getKey(), rev, exp, rev.subtract(exp));
+                })
+                .collect(Collectors.toList());
 
         return new FinancialSummaryDto(totalRevenue, totalExpenses, netProfit, profitMargin, breakdown);
     }

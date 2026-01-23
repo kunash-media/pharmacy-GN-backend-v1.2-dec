@@ -20,7 +20,9 @@ public class ProductResponseDto {
     private String productStatus;
     private String productDescription;
     private LocalDateTime createdAt;
+
     private Integer productQuantity;
+    
     private boolean prescriptionRequired;
     private String brandName;
     private String mfgDate;
@@ -35,6 +37,9 @@ public class ProductResponseDto {
     private List<String> productSubImages = new ArrayList<>();
     private Map<String, String> productDynamicFields;
     private List<String> productSizes = new ArrayList<>();
+
+
+    private Map<String, Integer> stockBySize;
 
     private boolean isApproved;
     private boolean isDeleted;
@@ -143,5 +148,13 @@ public class ProductResponseDto {
 
     public void setDeleted(boolean deleted) {
         isDeleted = deleted;
+    }
+
+    public Map<String, Integer> getStockBySize() {
+        return stockBySize;
+    }
+
+    public void setStockBySize(Map<String, Integer> stockBySize) {
+        this.stockBySize = stockBySize;
     }
 }

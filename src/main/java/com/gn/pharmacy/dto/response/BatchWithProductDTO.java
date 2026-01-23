@@ -21,16 +21,15 @@ public class BatchWithProductDTO {
     private String brandName;              // optional in MbP, can be null
     private Integer productTotalStock;
 
-
+    private String size;
 
     // Constructors
     public BatchWithProductDTO() {}
 
-
-    public BatchWithProductDTO(Long inventoryId, String batchNo, Integer quantity,
-                               String mfgDate, String expiryDate, String stockStatus,
-                               LocalDateTime lastUpdated, Long mbpId, Long productId,
-                               String itemName, String sku, String brandName, Integer productTotalStock) {
+    public BatchWithProductDTO(Long inventoryId, String batchNo, Integer quantity, String mfgDate,
+                               String expiryDate, String stockStatus, LocalDateTime lastUpdated,
+                               Long mbpId, Long productId, String itemName, String sku,
+                               String brandName, Integer productTotalStock, String size) {
         this.inventoryId = inventoryId;
         this.batchNo = batchNo;
         this.quantity = quantity;
@@ -44,8 +43,8 @@ public class BatchWithProductDTO {
         this.sku = sku;
         this.brandName = brandName;
         this.productTotalStock = productTotalStock;
+        this.size = size;
     }
-
 
     public Long getMbpId() {
         return mbpId;
@@ -102,4 +101,12 @@ public class BatchWithProductDTO {
 
     public Integer getProductTotalStock() { return productTotalStock; }
     public void setProductTotalStock(Integer productTotalStock) { this.productTotalStock = productTotalStock; }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
+    }
 }

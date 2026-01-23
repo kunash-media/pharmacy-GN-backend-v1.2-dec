@@ -27,10 +27,14 @@ public class OrderItemEntity {
     private Double subtotal;
     private String itemName;
 
+    @Column(name = "size_variant", length = 50)
+    private String size;
+
     // Constructors
     public OrderItemEntity() {}
 
-    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product, MbPEntity mbP, int quantity, Double itemPrice, Double itemOldPrice, Double subtotal, String itemName) {
+
+    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product, MbPEntity mbP, int quantity, Double itemPrice, Double itemOldPrice, Double subtotal, String itemName, String size) {
         this.orderItemId = orderItemId;
         this.order = order;
         this.product = product;
@@ -40,6 +44,7 @@ public class OrderItemEntity {
         this.itemOldPrice = itemOldPrice;
         this.subtotal = subtotal;
         this.itemName = itemName;
+        this.size = size;
     }
 
     public Long getOrderItemId() {
@@ -112,5 +117,13 @@ public class OrderItemEntity {
 
     public void setItemName(String itemName) {
         this.itemName = itemName;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
     }
 }

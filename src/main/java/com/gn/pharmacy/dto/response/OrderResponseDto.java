@@ -33,6 +33,7 @@ public class OrderResponseDto {
     private String orderStatus;
     private String orderDate;
     private String deliveryDate;
+    private String size;
     private List<OrderItemDto> orderItems;
 
 
@@ -254,5 +255,13 @@ public class OrderResponseDto {
 
     public void setDiscountAmount(Double discountAmount) {
         this.discountAmount = discountAmount;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
     }
 }

@@ -124,7 +124,7 @@ public class ProductEntity {
     // Helper method to get total quantity from all batches
     public Integer getTotalCalculatedStock() {
         return inventoryBatches.stream()
-                .mapToInt(InventoryEntity::getQuantity)
+                .mapToInt(InventoryEntity:: getTotalQuantity)
                 .sum();
     }
 
