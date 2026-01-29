@@ -3,6 +3,7 @@ package com.gn.pharmacy.dto.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +41,9 @@ public class ProductResponseDto {
 
 
     private Map<String, Integer> stockBySize;
+
+    private Map<String, String> mfgDates = new LinkedHashMap<>();   // size → mfg date
+    private Map<String, String> expDates = new LinkedHashMap<>();   // size → exp date
 
     private boolean isApproved;
     private boolean isDeleted;
@@ -156,5 +160,22 @@ public class ProductResponseDto {
 
     public void setStockBySize(Map<String, Integer> stockBySize) {
         this.stockBySize = stockBySize;
+    }
+
+
+    public Map<String, String> getMfgDates() {
+        return mfgDates;
+    }
+
+    public void setMfgDates(Map<String, String> mfgDates) {
+        this.mfgDates = mfgDates;
+    }
+
+    public Map<String, String> getExpDates() {
+        return expDates;
+    }
+
+    public void setExpDates(Map<String, String> expDates) {
+        this.expDates = expDates;
     }
 }

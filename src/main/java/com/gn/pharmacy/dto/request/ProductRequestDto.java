@@ -21,7 +21,7 @@ public class ProductRequestDto {
     private List<BigDecimal> productPrice = new ArrayList<>();
     private List<BigDecimal> productOldPrice = new ArrayList<>();
 
-    private String productStock;           // e.g., "In Stock", "Low Stock" — status string
+    private String productStock = "In Stock";           // e.g., "In Stock", "Low Stock" — status string
     private String productStatus;          // e.g., "ACTIVE", "INACTIVE"
     private String productDescription;
 
@@ -107,6 +107,7 @@ public class ProductRequestDto {
     public void setProductOldPrice(List<BigDecimal> productOldPrice) {
         this.productOldPrice = productOldPrice != null ? productOldPrice : new ArrayList<>();
     }
+
 
     public String getProductStock() {
         return productStock;

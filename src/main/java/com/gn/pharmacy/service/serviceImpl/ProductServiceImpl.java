@@ -30,7 +30,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -512,21 +515,282 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+
+
+//    @Override
+//    public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
+//        logger.debug("Starting bulk product creation from Excel");
+//
+//        Map<String, MultipartFile> imageMap = new HashMap<>();
+//        if (images != null) {
+//            for (MultipartFile image : images) {
+//                String name = image.getOriginalFilename();
+//                if (name != null) {
+//                    String base = name.contains(".") ? name.substring(0, name.lastIndexOf(".")) : name;
+//                    imageMap.put(base.trim().toLowerCase(), image);
+//                }
+//            }
+//        }
+//
+//        int uploadedCount = 0;
+//        int skippedCount = 0;
+//        List<String> skippedReasons = new ArrayList<>();
+//
+//        try (InputStream is = excelFile.getInputStream();
+//             Workbook workbook = new XSSFWorkbook(is)) {
+//
+//            Sheet sheet = workbook.getSheetAt(0);
+//            Iterator<Row> iterator = sheet.iterator();
+//            if (iterator.hasNext()) iterator.next(); // header
+//
+//            while (iterator.hasNext()) {
+//                Row row = iterator.next();
+//
+//                String productName = getCellValue(row.getCell(0)).trim();
+//                if (productName.isEmpty()) {
+//                    skippedCount++;
+//                    skippedReasons.add("Empty product name at row " + (row.getRowNum() + 1));
+//                    continue;
+//                }
+//
+//                if (productRepository.existsByProductName(productName)) {
+//                    skippedCount++;
+//                    skippedReasons.add("Duplicate product: " + productName);
+//                    continue;
+//                }
+//
+//                ProductRequestDto dto = new ProductRequestDto();
+//                dto.setProductName(productName);
+//                dto.setProductCategory(getCellValue(row.getCell(1)));
+//                dto.setProductSubCategory(getCellValue(row.getCell(2)));
+//                dto.setSku(getCellValue(row.getCell(21)));
+//
+//                // ────────────── SIZES ──────────────
+//                List<String> sizes = parseCommaList(row.getCell(12));
+//                dto.setProductSizes(sizes);
+//
+//                // ────────────── PRICES ──────────────
+//                List<BigDecimal> prices = parseDecimalList(row.getCell(3));
+//                List<BigDecimal> oldPrices = parseDecimalList(row.getCell(4));
+//                autoExpand(sizes, prices, "price", productName);
+//                autoExpand(sizes, oldPrices, "old price", productName);
+//                dto.setProductPrice(prices);
+//                dto.setProductOldPrice(oldPrices);
+//
+//                // ────────────── QUANTITIES → Map<String, Integer> ──────────────
+//                List<Integer> qtyList = parseIntegerList(row.getCell(22));
+//                autoExpand(sizes, qtyList, "quantity", productName);
+//
+//                Map<String, Integer> sizeQuantities = new LinkedHashMap<>();
+//                for (int i = 0; i < sizes.size(); i++) {
+//                    sizeQuantities.put(sizes.get(i), qtyList.get(i));
+//                }
+//                dto.setSizeQuantities(sizeQuantities);
+//
+//                // ────────────── MFG DATES → Map<String, String> ──────────────
+//                List<String> mfgList = parseCommaList(row.getCell(15));
+//                autoExpand(sizes, mfgList, "mfg date", productName);
+//
+//                Map<String, String> sizeMfgDates = new LinkedHashMap<>();
+//                for (int i = 0; i < sizes.size(); i++) {
+//                    sizeMfgDates.put(sizes.get(i), mfgList.get(i));
+//                }
+//                dto.setSizeMfgDates(sizeMfgDates);
+//
+//                // ────────────── EXP DATES → Map<String, String> ──────────────
+//                List<String> expList = parseCommaList(row.getCell(16));
+//                autoExpand(sizes, expList, "exp date", productName);
+//
+//                Map<String, String> sizeExpDates = new LinkedHashMap<>();
+//                for (int i = 0; i < sizes.size(); i++) {
+//                    sizeExpDates.put(sizes.get(i), expList.get(i));
+//                }
+//                dto.setSizeExpDates(sizeExpDates);
+//
+//                // ────────────── BATCH NOS (optional – you can keep as list or map) ──────────────
+//                List<String> batchNos = parseCommaList(row.getCell(17));
+//                autoExpand(sizes, batchNos, "batch no", productName);
+//
+//                // Option 1: keep as single string (joined) – as you had
+//                dto.setBatchNo(String.join(", ", batchNos));
+//
+//                // ────────────── IMAGES ──────────────
+//                String mainImageName = getCellValue(row.getCell(9)).trim();
+//                MultipartFile mainImage = imageMap.get(mainImageName.toLowerCase());
+//                if (mainImage == null && !mainImageName.isEmpty()) {
+//                    skippedCount++;
+//                    skippedReasons.add("Missing main image: " + productName);
+//                    continue;
+//                }
+//                if (mainImage != null) {
+//                    dto.setProductMainImage(mainImage);
+//                }
+//
+//                List<MultipartFile> subImages = new ArrayList<>();
+//                for (String img : parseCommaList(row.getCell(10))) {
+//                    MultipartFile f = imageMap.get(img.trim().toLowerCase());
+//                    if (f != null) {
+//                        subImages.add(f);
+//                    } else if (!img.trim().isEmpty()) {
+//                        skippedReasons.add("Missing sub image: " + img + " for " + productName);
+//                    }
+//                }
+//                if (!subImages.isEmpty()) {
+//                    dto.setProductSubImages(subImages);
+//                }
+//
+//                // ────────────── OTHER FIELDS ──────────────
+//                dto.setPrescriptionRequired(getBooleanCellValue(row.getCell(13)));
+//                dto.setBrandName(getCellValue(row.getCell(14)));
+//                dto.setBenefitsList(parseCommaList(row.getCell(18)));
+//                dto.setDirectionsList(parseCommaList(row.getCell(19)));
+//                dto.setIngredientsList(parseCommaList(row.getCell(20)));
+//
+//                try {
+//                    createProduct(dto);
+//                    uploadedCount++;
+//                } catch (Exception e) {
+//                    skippedCount++;
+//                    skippedReasons.add("Failed product '" + productName + "': " + e.getMessage());
+//                }
+//            }
+//        }
+//
+//        BulkUploadResponse response = new BulkUploadResponse();
+//        response.setUploadedCount(uploadedCount);
+//        response.setSkippedCount(skippedCount);
+//        response.setSkippedReasons(skippedReasons);
+//        return response;
+//    }
+//
+//
+//    private <T> void autoExpand(List<String> sizes, List<T> values, String field, String product) {
+//        if (sizes == null || sizes.isEmpty()) return;
+//        if (values == null || values.isEmpty())
+//            throw new IllegalArgumentException("Missing " + field + " for " + product);
+//
+//        if (values.size() == 1 && sizes.size() > 1) {
+//            T single = values.get(0);
+//            values.clear();
+//            for (int i = 0; i < sizes.size(); i++) values.add(single);
+//        }
+//
+//        if (values.size() != sizes.size())
+//            throw new IllegalArgumentException(field + " count mismatch for " + product);
+//    }
+//
+//    private List<BigDecimal> parseDecimalList(Cell cell) {
+//        List<BigDecimal> list = new ArrayList<>();
+//        for (String v : parseCommaList(cell)) list.add(new BigDecimal(v));
+//        return list;
+//    }
+//
+//    private List<Integer> parseIntegerList(Cell cell) {
+//        List<Integer> list = new ArrayList<>();
+//        for (String v : parseCommaList(cell)) list.add(Integer.parseInt(v));
+//        return list;
+//    }
+//
+//    // Helpers (unchanged)
+//    private List<String> parseCommaList(Cell cell) {
+//        String value = getCellValue(cell);
+//        if (value == null || value.trim().isEmpty()) return new ArrayList<>();
+//        return Arrays.stream(value.split(","))
+//                .map(String::trim)
+//                .filter(s -> !s.isEmpty())
+//                .collect(Collectors.toList());
+//    }
+//
+//
+//
+//
+//    private Boolean getBooleanCellValue(Cell cell) {
+//        if (cell == null) return null;
+//        try {
+//            switch (cell.getCellType()) {
+//                case STRING:
+//                    String strVal = cell.getStringCellValue().trim().toLowerCase();
+//                    if (strVal.isEmpty()) return null;
+//                    return switch (strVal) {
+//                        case "true", "yes", "1" -> true;
+//                        case "false", "no", "0" -> false;
+//                        default -> null;
+//                    };
+//                case BOOLEAN:
+//                    return cell.getBooleanCellValue();
+//                case NUMERIC:
+//                    double numVal = cell.getNumericCellValue();
+//                    return numVal == 1.0;
+//                default:
+//                    return null;
+//            }
+//        } catch (Exception e) {
+//            logger.warn("Failed to parse boolean from cell: {}", cell);
+//            return null;
+//        }
+//    }
+//
+//    private String getCellValue(Cell cell) {
+//        if (cell == null) return "";
+//        switch (cell.getCellType()) {
+//            case STRING:
+//                return cell.getStringCellValue().trim();
+//            case NUMERIC:
+//                return String.valueOf(cell.getNumericCellValue());
+//            case BOOLEAN:
+//                return String.valueOf(cell.getBooleanCellValue());
+//            default:
+//                return "";
+//        }
+//    }
+//
+//
+//    private Integer getIntegerCellValue(Cell cell) {
+//        if (cell == null) return null;
+//        try {
+//            switch (cell.getCellType()) {
+//                case STRING:
+//                    String strVal = cell.getStringCellValue().trim();
+//                    if (strVal.isEmpty()) return null;
+//                    return Integer.parseInt(strVal);
+//                case NUMERIC:
+//                    double numVal = cell.getNumericCellValue();
+//                    if (numVal == Math.floor(numVal)) return (int) numVal;
+//                    logger.warn("Non-integer numeric value found: {}", numVal);
+//                    return null;
+//                case BOOLEAN:
+//                    return cell.getBooleanCellValue() ? 1 : 0;
+//                default:
+//                    return null;
+//            }
+//        } catch (NumberFormatException e) {
+//            logger.warn("Failed to parse integer from cell: {}", cell);
+//            return null;
+//        }
+//    }
+
+
     @Override
     public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
-        logger.debug("Starting bulk product creation from Excel");
+        logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
+        logger.info("║              BULK PRODUCT UPLOAD STARTED ── {}", Instant.now());
+        logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
 
+        // ─── Image map preparation ───
         Map<String, MultipartFile> imageMap = new HashMap<>();
-        if (images != null) {
+        if (images != null && !images.isEmpty()) {
+            logger.debug("Received {} product images", images.size());
             for (MultipartFile image : images) {
-                String fullFilename = image.getOriginalFilename();
-                if (fullFilename != null) {
-                    String baseName = fullFilename.contains(".")
-                            ? fullFilename.substring(0, fullFilename.lastIndexOf('.'))
-                            : fullFilename;
-                    imageMap.put(baseName.trim().toLowerCase(), image);
+                String filename = image.getOriginalFilename();
+                if (filename != null && !filename.trim().isEmpty()) {
+                    String key = normalizeImageKey(filename);
+                    imageMap.put(key, image);
+                    logger.trace("Mapped image: {} → key={}", filename, key);
                 }
             }
+            logger.info("Successfully prepared {} image(s) for upload", imageMap.size());
+        } else {
+            logger.info("No product images provided");
         }
 
         int uploadedCount = 0;
@@ -537,193 +801,329 @@ public class ProductServiceImpl implements ProductService {
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
-            Iterator<Row> rowIterator = sheet.iterator();
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                logger.error("Excel file has no header row ── upload aborted");
+                throw new IllegalArgumentException("Excel file has no header row");
+            }
 
-            if (rowIterator.hasNext()) rowIterator.next(); // Skip header
+            // ─── Column name → index mapping ───
+            Map<String, Integer> colIndex = new HashMap<>();
+            for (int i = 0; i < headerRow.getLastCellNum(); i++) {
+                String header = getCellValue(headerRow.getCell(i))
+                        .trim()
+                        .toLowerCase()
+                        .replaceAll("\\s+", " ");
+                if (!header.isEmpty()) {
+                    colIndex.put(header, i);
+                }
+            }
 
-            while (rowIterator.hasNext()) {
-                Row row = rowIterator.next();
+            logger.info("Detected {} columns in Excel sheet", colIndex.size());
+            logger.debug("Column mapping: {}", colIndex);
 
-                String productName = getCellValue(row.getCell(0)).trim();
+            // Required columns validation
+            String[] required = {
+                    "product name", "category", "sub category", "prices", "old prices",
+                    "sizes", "variant quantities"
+            };
+            List<String> missing = Arrays.stream(required)
+                    .filter(req -> !colIndex.containsKey(req))
+                    .toList();
+
+            if (!missing.isEmpty()) {
+                String msg = "Missing required column(s): " + String.join(", ", missing);
+                logger.error(msg);
+                throw new IllegalArgumentException(msg);
+            }
+
+            Iterator<Row> iterator = sheet.rowIterator();
+            iterator.next(); // skip header
+
+            int rowNumber = 1;
+
+            while (iterator.hasNext()) {
+                Row row = iterator.next();
+                rowNumber++;
+
+                String productName = getCellValue(row.getCell(colIndex.get("product name"))).trim();
                 if (productName.isEmpty()) {
                     skippedCount++;
-                    skippedReasons.add("Empty product name at row " + (row.getRowNum() + 1));
+                    String reason = "Skipped ── empty product name (row " + rowNumber + ")";
+                    skippedReasons.add(reason);
+                    logger.warn(reason);
                     continue;
                 }
 
+                logger.info("Processing row {} ── Product: {}", rowNumber, productName);
+
                 if (productRepository.existsByProductName(productName)) {
                     skippedCount++;
-                    skippedReasons.add("Duplicate product name: " + productName);
+                    String reason = "Skipped ── duplicate product name: " + productName + " (row " + rowNumber + ")";
+                    skippedReasons.add(reason);
+                    logger.warn(reason);
                     continue;
                 }
 
                 ProductRequestDto dto = new ProductRequestDto();
-
                 dto.setProductName(productName);
-                dto.setProductCategory(getCellValue(row.getCell(1)));
-                dto.setProductSubCategory(getCellValue(row.getCell(2)));
-                dto.setSku(getCellValue(row.getCell(21)));
-
-                // Prices
-                List<BigDecimal> prices = new ArrayList<>();
-                String priceStr = getCellValue(row.getCell(3)).trim();
-                if (priceStr.isEmpty()) {
-                    skippedCount++;
-                    skippedReasons.add("Missing price for product: " + productName);
-                    continue;
-                }
-                try {
-                    for (String p : priceStr.split(",")) {
-                        String clean = p.trim().replace("\u00A0", "");
-                        if (!clean.isEmpty()) prices.add(new BigDecimal(clean));
-                    }
-                } catch (Exception e) {
-                    skippedCount++;
-                    skippedReasons.add("Invalid price for product: " + productName);
-                    continue;
-                }
-                dto.setProductPrice(prices);
-
-                // Old prices (optional)
-                List<BigDecimal> oldPrices = new ArrayList<>();
-                String oldPriceStr = getCellValue(row.getCell(4));
-                if (!oldPriceStr.isEmpty()) {
-                    try {
-                        for (String p : oldPriceStr.split(",")) {
-                            String clean = p.trim().replace("\u00A0", "");
-                            if (!clean.isEmpty()) oldPrices.add(new BigDecimal(clean));
-                        }
-                    } catch (Exception ignored) {
-                        // Ignore invalid old prices
-                    }
-                }
-                dto.setProductOldPrice(oldPrices);
+                dto.setProductCategory(getCellValue(row.getCell(colIndex.get("category"))));
+                dto.setProductSubCategory(getCellValue(row.getCell(colIndex.get("sub category"))));
+                dto.setSku(getCellValue(row.getCell(colIndex.get("sku"))));
 
                 // Sizes
-                List<String> sizes = new ArrayList<>();
-                String sizeStr = getCellValue(row.getCell(12));
-                if (!sizeStr.isEmpty()) {
-                    sizes = Arrays.stream(sizeStr.split(","))
-                            .map(String::trim)
-                            .map(s -> s.replace("\u00A0", ""))
-                            .filter(s -> !s.isEmpty())
-                            .collect(Collectors.toList());
-                }
+                List<String> sizes = parseSemicolonList(row.getCell(colIndex.get("sizes")));
                 dto.setProductSizes(sizes);
 
-                // Auto-apply single price to all sizes
-                if (sizes.size() > 1 && prices.size() == 1) {
-                    BigDecimal single = prices.get(0);
-                    prices = new ArrayList<>();
-                    for (int i = 0; i < sizes.size(); i++) prices.add(single);
-                    dto.setProductPrice(prices);
+                // Prices & Old Prices
+                List<BigDecimal> prices = parseDecimalList(row.getCell(colIndex.get("prices")));
+                List<BigDecimal> oldPrices = parseDecimalList(row.getCell(colIndex.get("old prices")));
+                autoExpand(sizes, prices, "price", productName);
+                autoExpand(sizes, oldPrices, "old price", productName);
+                dto.setProductPrice(prices);
+                dto.setProductOldPrice(oldPrices);
 
-                    if (oldPrices.size() == 1) {
-                        BigDecimal singleOld = oldPrices.get(0);
-                        oldPrices = new ArrayList<>();
-                        for (int i = 0; i < sizes.size(); i++) oldPrices.add(singleOld);
-                        dto.setProductOldPrice(oldPrices);
-                    }
+                // Variant Quantities
+                List<Integer> qtyList = parseIntegerList(row.getCell(colIndex.get("variant quantities")));
+                autoExpand(sizes, qtyList, "quantity", productName);
+                Map<String, Integer> sizeQuantities = new LinkedHashMap<>();
+                for (int i = 0; i < sizes.size(); i++) {
+                    sizeQuantities.put(sizes.get(i), qtyList.get(i));
                 }
+                dto.setSizeQuantities(sizeQuantities);
 
-                // Validate size-price mapping
-                try {
-                    validateSizePriceMapping(sizes, prices, oldPrices, productName);
-                } catch (IllegalArgumentException e) {
+                // Optional fields with defaults
+                dto.setPrescriptionRequired(getOptionalBoolean(row, colIndex, "prescription", false));
+                dto.setBrandName(getOptionalString(row, colIndex, "brand", null));
+
+                dto.setSizeMfgDates(buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("mfg dates")))));
+                dto.setSizeExpDates(buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("exp dates")))));
+
+                // Batch No – take first non-empty value (no duplication)
+                String batchNo = "";
+                List<String> batchList = parseSemicolonList(row.getCell(colIndex.get("batch no")));
+                if (!batchList.isEmpty()) {
+                    batchNo = batchList.stream()
+                            .filter(s -> !s.trim().isEmpty())
+                            .findFirst()
+                            .orElse("");
+                }
+                dto.setBatchNo(batchNo);
+
+                dto.setBenefitsList(parseSemicolonList(row.getCell(colIndex.get("benefits"))));
+                dto.setDirectionsList(parseSemicolonList(row.getCell(colIndex.get("directions"))));
+                dto.setIngredientsList(parseSemicolonList(row.getCell(colIndex.get("ingredients"))));
+
+                dto.setProductDynamicFields(parseDynamicFields(row, colIndex));
+
+                // IMPORTANT: Default approval for bulk upload
+                dto.setApproved(true);
+
+                // ─── Images ───
+                String mainImageName = getCellValue(row.getCell(colIndex.get("main image"))).trim();
+                MultipartFile mainImage = mainImageName.isEmpty() ? null : imageMap.get(normalizeImageKey(mainImageName));
+                if (mainImage == null && !mainImageName.isEmpty()) {
+                    String reason = "Skipped ── missing main image '" + mainImageName + "' for " + productName;
                     skippedCount++;
-                    skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
+                    skippedReasons.add(reason);
+                    logger.warn(reason);
                     continue;
                 }
+                dto.setProductMainImage(mainImage);
 
-                // Quantity (fallback)
-                Integer quantity = getIntegerCellValue(row.getCell(8));
-                if (quantity == null) {
-                    skippedCount++;
-                    skippedReasons.add("Invalid quantity for product: " + productName);
-                    continue;
-                }
-                dto.setProductQuantity(quantity);
-
-                // Main image
-                String mainImageName = getCellValue(row.getCell(9)).trim();
-                if (!mainImageName.isEmpty()) {
-                    MultipartFile mainImage = imageMap.get(mainImageName.toLowerCase());
-                    if (mainImage != null) {
-                        dto.setProductMainImage(mainImage);
-                    } else {
-                        skippedCount++;
-                        skippedReasons.add("Missing main image: " + productName);
-                        continue;
-                    }
-                }
-
-                // Sub images
-                String subImagesStr = getCellValue(row.getCell(10));
                 List<MultipartFile> subImages = new ArrayList<>();
-                if (!subImagesStr.isEmpty()) {
-                    boolean missing = false;
-                    for (String name : subImagesStr.split(",")) {
-                        MultipartFile img = imageMap.get(name.trim().toLowerCase());
-                        if (img != null) subImages.add(img);
-                        else {
-                            missing = true;
-                            skippedReasons.add("Missing sub image: " + name);
-                        }
-                    }
-                    if (missing) {
-                        skippedCount++;
-                        continue;
+                for (String imgName : parseSemicolonList(row.getCell(colIndex.get("sub images")))) {
+                    String key = normalizeImageKey(imgName);
+                    MultipartFile f = imageMap.get(key);
+                    if (f != null) {
+                        subImages.add(f);
+                    } else if (!imgName.trim().isEmpty()) {
+                        String reason = "Missing sub image '" + imgName + "' for " + productName;
+                        skippedReasons.add(reason);
+                        logger.warn(reason);
                     }
                 }
                 dto.setProductSubImages(subImages);
 
-                // Dynamic fields
-                Map<String, String> dynamicFields = new HashMap<>();
-                String dynamicStr = getCellValue(row.getCell(11));
-                if (!dynamicStr.isEmpty()) {
-                    for (String pair : dynamicStr.split(",")) {
-                        String[] kv = pair.split(":");
-                        if (kv.length == 2) dynamicFields.put(kv[0].trim(), kv[1].trim());
-                    }
-                }
-                dto.setProductDynamicFields(dynamicFields);
+                // Debug final DTO state before creation
+                logger.debug("Creating product '{}' | approved={} | sizes={} | prices={} | batch='{}'",
+                        productName, dto.isApproved(), dto.getProductSizes(), dto.getProductPrice(), dto.getBatchNo());
 
-                // Medical & brand
-                dto.setPrescriptionRequired(Boolean.TRUE.equals(getBooleanCellValue(row.getCell(13))));
-                dto.setBrandName(getCellValue(row.getCell(14)));
-
-                // Per-size data (if Excel supports it - extend columns as needed)
-                // For now, fallback to single quantity - extend later if needed
-                // dto.setSizeQuantities(...); // parse from additional columns
-
-                dto.setMfgDate(getCellValue(row.getCell(15)));
-                dto.setExpDate(getCellValue(row.getCell(16)));
-                dto.setBatchNo(getCellValue(row.getCell(17)));
-
-                dto.setBenefitsList(parseCommaList(row.getCell(18)));
-                dto.setDirectionsList(parseCommaList(row.getCell(19)));
-                dto.setIngredientsList(parseCommaList(row.getCell(20)));
-
+                // Create product
                 try {
                     createProduct(dto);
                     uploadedCount++;
+                    logger.info("→ SUCCESS: Product created ── {} (row {})", productName, rowNumber);
                 } catch (Exception e) {
                     skippedCount++;
-                    skippedReasons.add("Error creating product " + productName + ": " + e.getMessage());
+                    String reason = "Failed to create '" + productName + "' (row " + rowNumber + "): " + e.getMessage();
+                    skippedReasons.add(reason);
+                    logger.error("→ FAILURE: {}", reason, e);
                 }
             }
+
         } catch (Exception e) {
-            throw new RuntimeException("Bulk upload failed: " + e.getMessage(), e);
+            logger.error("CRITICAL ERROR during bulk upload processing ── aborting", e);
+            throw e;
         }
+
+        logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
+        logger.info("║              BULK PRODUCT UPLOAD FINISHED ── {}", Instant.now());
+        logger.info("║  Uploaded: {}    Skipped: {}    Total processed: {}",
+                uploadedCount, skippedCount, (uploadedCount + skippedCount));
+        logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
 
         BulkUploadResponse response = new BulkUploadResponse();
         response.setUploadedCount(uploadedCount);
         response.setSkippedCount(skippedCount);
         response.setSkippedReasons(skippedReasons);
+
         return response;
     }
 
-    // Helpers (unchanged)
+    // ────────────────────────────────────────────────────────────────────────────────
+//  NEW: Unified semicolon-based list parser (used everywhere)
+// ────────────────────────────────────────────────────────────────────────────────
+    private List<String> parseSemicolonList(Cell cell) {
+        String value = getCellValue(cell);
+        if (value == null || value.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        return Arrays.stream(value.split(";"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────────
+//  Updated parseDecimalList & parseIntegerList to use semicolon parser
+// ────────────────────────────────────────────────────────────────────────────────
+    private List<BigDecimal> parseDecimalList(Cell cell) {
+        List<BigDecimal> list = new ArrayList<>();
+        for (String v : parseSemicolonList(cell)) {
+            String cleaned = v.trim().replaceAll("[^0-9.-]", "");
+            if (cleaned.isEmpty()) continue;
+            try {
+                list.add(new BigDecimal(cleaned));
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid decimal skipped: '{}' (row {})", v, cell.getRowIndex() + 1);
+            }
+        }
+        return list;
+    }
+
+    private List<Integer> parseIntegerList(Cell cell) {
+        List<Integer> list = new ArrayList<>();
+        for (String v : parseSemicolonList(cell)) {
+            String cleaned = v.trim();
+            if (cleaned.isEmpty()) continue;
+            try {
+                list.add(Integer.parseInt(cleaned));
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid integer skipped: '{}' (row {})", v, cell.getRowIndex() + 1);
+            }
+        }
+        return list;
+    }
+
+    private List<String> getOptionalList(Row row, Map<String, Integer> colIndex, String colName) {
+        Integer idx = colIndex.get(colName);
+        if (idx == null) return new ArrayList<>();
+        return parseSemicolonList(row.getCell(idx));   // ← now semicolon
+    }
+
+
+
+    // ─── Helper methods ────────────────────────────────────────────────────────
+
+    private String normalizeImageKey(String name) {
+        if (name == null) return "";
+        return name.trim()
+                .toLowerCase()
+                .replaceAll("\\s+", "-")
+                .replaceAll("_", "-")
+                .replaceAll("-+", "-")
+                .replaceFirst("\\.[^.]*$", "");
+    }
+
+    private Map<String, String> parseDynamicFields(Row row, Map<String, Integer> colIndex) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        Integer idx = colIndex.get("dynamic fields");
+        if (idx == null) return fields;
+
+        String raw = getCellValue(row.getCell(idx)).trim();
+        if (raw.isEmpty()) return fields;
+
+        for (String part : raw.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+
+            int colon = trimmed.indexOf(':');
+            if (colon > 0) {
+                String key = trimmed.substring(0, colon).trim();
+                String value = trimmed.substring(colon + 1).trim();
+                if (!key.isEmpty()) {
+                    fields.put(key, value);
+                }
+            } else if (!trimmed.isEmpty()) {
+                fields.put(trimmed, "");
+            }
+        }
+        return fields;
+    }
+
+    private Map<String, String> buildOptionalSizeMap(List<String> sizes, List<String> values) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (sizes.isEmpty()) return map;
+
+        if (values.isEmpty() || (values.size() == 1 && values.get(0).isEmpty())) {
+            sizes.forEach(s -> map.put(s, ""));
+            return map;
+        }
+
+        if (values.size() == 1 && sizes.size() > 1) {
+            String single = values.get(0);
+            values = Collections.nCopies(sizes.size(), single);
+        }
+
+        int limit = Math.min(sizes.size(), values.size());
+        for (int i = 0; i < limit; i++) {
+            map.put(sizes.get(i), values.get(i));
+        }
+        return map;
+    }
+
+    private boolean getOptionalBoolean(Row row, Map<String, Integer> colIndex, String colName, boolean defaultValue) {
+        Integer idx = colIndex.get(colName);
+        if (idx == null) return defaultValue;
+        Boolean val = getBooleanCellValue(row.getCell(idx));
+        return val != null ? val : defaultValue;
+    }
+
+    private String getOptionalString(Row row, Map<String, Integer> colIndex, String colName, String defaultValue) {
+        Integer idx = colIndex.get(colName);
+        if (idx == null) return defaultValue;
+        String val = getCellValue(row.getCell(idx));
+        return val.isEmpty() ? defaultValue : val;
+    }
+
+
+    private <T> void autoExpand(List<String> sizes, List<T> values, String field, String product) {
+        if (sizes == null || sizes.isEmpty()) return;
+        if (values == null || values.isEmpty()) {
+            throw new IllegalArgumentException("Missing " + field + " for product: " + product);
+        }
+        if (values.size() == 1 && sizes.size() > 1) {
+            T single = values.get(0);
+            values.clear();
+            values.addAll(Collections.nCopies(sizes.size(), single));
+        }
+        if (values.size() != sizes.size()) {
+            throw new IllegalArgumentException(field + " count mismatch for " + product + " (sizes: " + sizes.size() + ", values: " + values.size() + ")");
+        }
+    }
+
+
     private List<String> parseCommaList(Cell cell) {
         String value = getCellValue(cell);
         if (value == null || value.trim().isEmpty()) return new ArrayList<>();
@@ -732,6 +1132,42 @@ public class ProductServiceImpl implements ProductService {
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
     }
+
+    private Boolean getBooleanCellValue(Cell cell) {
+        if (cell == null) return null;
+        try {
+            switch (cell.getCellType()) {
+                case STRING:
+                    String s = cell.getStringCellValue().trim().toLowerCase();
+                    if (s.isEmpty()) return null;
+                    return "true".equals(s) || "yes".equals(s) || "1".equals(s);
+                case BOOLEAN:
+                    return cell.getBooleanCellValue();
+                case NUMERIC:
+                    return cell.getNumericCellValue() == 1.0;
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) return "";
+        try {
+            switch (cell.getCellType()) {
+                case STRING: return cell.getStringCellValue().trim();
+                case NUMERIC: return String.valueOf(cell.getNumericCellValue());
+                case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
+                case FORMULA: return cell.getCellFormula();
+                default: return "";
+            }
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
 
     private void validateSizePriceMapping(List<String> sizes, List<BigDecimal> prices,
                                           List<BigDecimal> oldPrices, String productName) {
@@ -745,70 +1181,6 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
-    private Integer getIntegerCellValue(Cell cell) {
-        if (cell == null) return null;
-        try {
-            switch (cell.getCellType()) {
-                case STRING:
-                    String strVal = cell.getStringCellValue().trim();
-                    if (strVal.isEmpty()) return null;
-                    return Integer.parseInt(strVal);
-                case NUMERIC:
-                    double numVal = cell.getNumericCellValue();
-                    if (numVal == Math.floor(numVal)) return (int) numVal;
-                    logger.warn("Non-integer numeric value found: {}", numVal);
-                    return null;
-                case BOOLEAN:
-                    return cell.getBooleanCellValue() ? 1 : 0;
-                default:
-                    return null;
-            }
-        } catch (NumberFormatException e) {
-            logger.warn("Failed to parse integer from cell: {}", cell);
-            return null;
-        }
-    }
-
-    private Boolean getBooleanCellValue(Cell cell) {
-        if (cell == null) return null;
-        try {
-            switch (cell.getCellType()) {
-                case STRING:
-                    String strVal = cell.getStringCellValue().trim().toLowerCase();
-                    if (strVal.isEmpty()) return null;
-                    return switch (strVal) {
-                        case "true", "yes", "1" -> true;
-                        case "false", "no", "0" -> false;
-                        default -> null;
-                    };
-                case BOOLEAN:
-                    return cell.getBooleanCellValue();
-                case NUMERIC:
-                    double numVal = cell.getNumericCellValue();
-                    return numVal == 1.0;
-                default:
-                    return null;
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to parse boolean from cell: {}", cell);
-            return null;
-        }
-    }
-
-    private String getCellValue(Cell cell) {
-        if (cell == null) return "";
-        switch (cell.getCellType()) {
-            case STRING:
-                return cell.getStringCellValue().trim();
-            case NUMERIC:
-                return String.valueOf(cell.getNumericCellValue());
-            case BOOLEAN:
-                return String.valueOf(cell.getBooleanCellValue());
-            default:
-                return "";
-        }
-    }
-
     private List<String> buildCategoryPath(String subCategory) {
         if (subCategory == null || subCategory.trim().isEmpty()) return new ArrayList<>();
         return Arrays.stream(subCategory.split(">"))
@@ -817,9 +1189,12 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+
+
     private ProductResponseDto mapToResponseDto(ProductEntity entity) {
         ProductResponseDto responseDto = new ProductResponseDto();
 
+        // ─── Basic & list fields ───
         responseDto.setApproved(entity.isApproved());
         responseDto.setDeleted(entity.isDeleted());
         responseDto.setProductId(entity.getProductId());
@@ -841,26 +1216,103 @@ public class ProductServiceImpl implements ProductService {
         responseDto.setDirectionsList(entity.getDirectionsList() != null ? entity.getDirectionsList() : new ArrayList<>());
         responseDto.setCategoryPath(entity.getCategoryPath() != null ? entity.getCategoryPath() : new ArrayList<>());
 
-        // Stock by size (from variants across all batches)
+        // ─── Inventory / Batch / Variant aggregation ───
         Map<String, Integer> stockBySize = new HashMap<>();
         int totalQuantity = 0;
 
-        List<InventoryEntity> inventories = inventoryRepository.findByProduct(entity);
-        for (InventoryEntity inv : inventories) {
-            if (inv.getVariants() != null) {
-                for (BatchVariant v : inv.getVariants()) {
-                    String sizeKey = v.getSize() != null ? v.getSize() : "DEFAULT";
-                    int qty = v.getQuantity() != null ? v.getQuantity() : 0;
-                    stockBySize.merge(sizeKey, qty, Integer::sum);
-                    totalQuantity += qty;
+        // Representative single values (fallback / summary)
+        String selectedMfgDate   = null;
+        String selectedExpDate   = null;
+        String selectedBatchNo   = null;
+
+        // Track earliest expiry
+        LocalDate soonestExpiry = null;
+
+        // NEW: Per-size maps for detailed view
+        Map<String, String> sizeToMfgDate = new LinkedHashMap<>();
+        Map<String, String> sizeToExpDate = new LinkedHashMap<>();
+
+        List<InventoryEntity> batches = entity.getInventoryBatches();
+
+        if (batches != null && !batches.isEmpty()) {
+            for (InventoryEntity batch : batches) {
+                // Batch number: last non-empty (most recent)
+                if (batch.getBatchNo() != null && !batch.getBatchNo().trim().isEmpty()) {
+                    selectedBatchNo = batch.getBatchNo().trim();
+                }
+
+                List<BatchVariant> variants = batch.getVariants();
+                if (variants != null && !variants.isEmpty()) {
+                    for (BatchVariant variant : variants) {
+                        String sizeKey = (variant.getSize() != null && !variant.getSize().trim().isEmpty())
+                                ? variant.getSize().trim()
+                                : "DEFAULT";
+
+                        int qty = (variant.getQuantity() != null) ? variant.getQuantity() : 0;
+                        stockBySize.merge(sizeKey, qty, Integer::sum);
+                        totalQuantity += qty;
+
+                        // MFG date – collect per size + pick representative
+                        String variantMfg = variant.getMfgDate();
+                        if (variantMfg != null && !variantMfg.trim().isEmpty()) {
+                            sizeToMfgDate.put(sizeKey, variantMfg.trim());
+
+                            // Representative: take first valid one
+                            if (selectedMfgDate == null) {
+                                selectedMfgDate = variantMfg.trim();
+                            }
+                        }
+
+                        // EXP date – collect per size + pick earliest
+                        String variantExp = variant.getExpDate();
+                        if (variantExp != null && !variantExp.trim().isEmpty()) {
+                            sizeToExpDate.put(sizeKey, variantExp.trim());
+
+                            try {
+                                LocalDate exp = LocalDate.parse(variantExp.trim());
+                                if (soonestExpiry == null || exp.isBefore(soonestExpiry)) {
+                                    soonestExpiry = exp;
+                                    selectedExpDate = variantExp.trim();
+                                }
+                            } catch (DateTimeParseException e) {
+                                logger.warn("Invalid expiry date format → product {}, batch {}, value: {}",
+                                        entity.getProductId(), batch.getBatchNo(), variantExp);
+                                if (selectedExpDate == null) {
+                                    selectedExpDate = variantExp.trim();
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        responseDto.setStockBySize(stockBySize);
-        responseDto.setProductQuantity(totalQuantity);
+        // Fallback: if no batch data found, use per-size maps (first entry)
+        if (selectedMfgDate == null && !sizeToMfgDate.isEmpty()) {
+            selectedMfgDate = sizeToMfgDate.values().stream()
+                    .filter(s -> !s.isEmpty())
+                    .findFirst().orElse(null);
+        }
+        if (selectedExpDate == null && !sizeToExpDate.isEmpty()) {
+            selectedExpDate = sizeToExpDate.values().stream()
+                    .filter(s -> !s.isEmpty())
+                    .findFirst().orElse(null);
+        }
 
-        // Images
+        // Set values
+        responseDto.setProductQuantity(totalQuantity);
+        responseDto.setStockBySize(stockBySize);
+
+        // Keep existing scalar fields (fallback / summary)
+        responseDto.setMfgDate(selectedMfgDate);
+        responseDto.setExpDate(selectedExpDate);
+        responseDto.setBatchNo(selectedBatchNo);
+
+        // NEW: Add per-size detailed maps
+        responseDto.setMfgDates(sizeToMfgDate);
+        responseDto.setExpDates(sizeToExpDate);
+
+        // ─── Images & dynamic fields ───
         if (entity.getProductMainImage() != null) {
             responseDto.setProductMainImage("/api/products/" + entity.getProductId() + "/image");
         }

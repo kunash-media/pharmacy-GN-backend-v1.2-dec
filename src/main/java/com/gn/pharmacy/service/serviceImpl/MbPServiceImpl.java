@@ -546,4 +546,28 @@ public class MbPServiceImpl implements MbPService {
         logger.debug("DTO conversion completed for MB product ID: {}", e.getId());
         return d;
     }
+
+
+    @Override
+    public List<String> getAvailableSizes(Long mbpId) {
+        MbPEntity mbp = repo.findById(mbpId)
+                .orElseThrow(() -> new RuntimeException("MB Product not found with ID: " + mbpId));
+
+        // Option A: Return all declared sizes (simplest, most common for frontend dropdown)
+        return new ArrayList<>(mbp.getProductSizes());
+
+        // ───────────────────────────────────────────────────────────────
+        // Option B: Return only sizes that actually have stock > 0 (recommended)
+        // Uncomment if you want "truly available" sizes
+        /*
+        return mbp.getInventoryBatches().stream()
+                .flatMap(batch -> batch.getVariants().stream())
+                .filter(variant -> variant.getQuantity() != null && variant.getQuantity() > 0)
+                .map(BatchVariant::getSize)
+                .filter(size -> size != null && !size.trim().isEmpty())
+                .distinct()
+                .sorted()                     // optional: sort alphabetically or by custom order
+                .collect(Collectors.toList());
+        */
+    }
 }

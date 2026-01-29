@@ -1,6 +1,9 @@
 package com.gn.pharmacy.dto.request;
 
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class OrderItemDto {
 
     private Long orderItemId;
@@ -15,6 +18,7 @@ public class OrderItemDto {
 
     private String size;
 
+    private List<ExchangeDto> exchanges = new ArrayList<>();
 
     // ADD THIS FIELD
     private String productMainImage;  // URL like "/api/products/15/image"
@@ -103,5 +107,13 @@ public class OrderItemDto {
 
     public void setSize(String size) {
         this.size = size;
+    }
+
+    public List<ExchangeDto> getExchanges() {
+        return exchanges;
+    }
+
+    public void setExchanges(List<ExchangeDto> exchanges) {
+        this.exchanges = exchanges;
     }
 }

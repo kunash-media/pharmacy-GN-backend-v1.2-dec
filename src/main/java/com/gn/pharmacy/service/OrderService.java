@@ -1,5 +1,6 @@
 package com.gn.pharmacy.service;
 
+import com.gn.pharmacy.dto.request.ExchangeRequestDto;
 import com.gn.pharmacy.dto.request.OrderRequestDto;
 import com.gn.pharmacy.dto.response.OrderResponseDto;
 import org.springframework.data.domain.Page;
@@ -17,5 +18,7 @@ public interface OrderService {
     OrderResponseDto cancelOrder(Long orderId);
 
     Page<OrderResponseDto> getOrdersByUserId(Long userId, Pageable pageable);
+
+    OrderResponseDto requestExchange(Long orderItemId, ExchangeRequestDto exchangeRequestDto);
 }
 

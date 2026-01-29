@@ -14,22 +14,6 @@ import java.util.List;
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItemEntity, Long>, JpaSpecificationExecutor<OrderItemEntity> {
 
-    // Add inside OrderItemRepository interface
-//    @Query("""
-//    SELECT COALESCE(p.productName, m.title, 'Unknown Product'),
-//           SUM(oi.quantity),
-//           SUM(oi.subtotal)
-//    FROM OrderItemEntity oi
-//    LEFT JOIN oi.product p
-//    LEFT JOIN oi.MbP m
-//    JOIN oi.order o
-//    WHERE o.orderDate >= :from
-//    GROUP BY COALESCE(p.productId, m.id)
-//    ORDER BY SUM(oi.subtotal) DESC
-//    """)
-//    List<Object[]> findTopSelling(@Param("from") LocalDateTime from, Pageable pageable);
-
-
     @Query(value = """
     SELECT 
         COALESCE(p.product_name, m.title, 'Unknown Product') as product_name,
@@ -48,5 +32,4 @@ public interface OrderItemRepository extends JpaRepository<OrderItemEntity, Long
             @Param("fromDate") LocalDateTime fromDate,
             @Param("limit") int limit
     );
-
 }

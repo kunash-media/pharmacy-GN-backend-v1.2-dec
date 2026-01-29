@@ -309,13 +309,38 @@ public class ProductController {
         }
     }
 
+
+
+//    @PostMapping(value = "/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    public ResponseEntity<BulkUploadResponse> bulkUploadProducts(
+//            @RequestPart("excelFile") MultipartFile excelFile,
+//            @RequestPart(value = "productImages", required = false) List<MultipartFile> images) {
+//
+//        logger.info("Request received for bulk product upload");
+//        try {
+//            BulkUploadResponse response = productService.bulkCreateProducts(excelFile, images);
+//
+//            logger.info("Bulk upload completed: {} uploaded, {} skipped",
+//                    response.getUploadedCount(), response.getSkippedCount());
+//
+//            return ResponseEntity.ok(response);
+//
+//        } catch (IllegalArgumentException e) {
+//            logger.warn("Invalid input for bulk upload: {}", e.getMessage());
+//            return ResponseEntity.badRequest().build();
+//        } catch (Exception e) {
+//            logger.error("Error during bulk upload: {}", e.getMessage(), e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
+
+
     @PostMapping(value = "/bulk-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BulkUploadResponse> bulkUploadProducts(
             @RequestPart("excelFile") MultipartFile excelFile,
             @RequestPart(value = "productImages", required = false) List<MultipartFile> images) {
 
         logger.info("Request received for bulk product upload");
-
         try {
             BulkUploadResponse response = productService.bulkCreateProducts(excelFile, images);
 
@@ -332,7 +357,6 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
 
     @GetMapping("/get-category-by-path")
     public ResponseEntity<List<ProductResponseDto>> getByCategoryPath(

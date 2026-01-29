@@ -45,10 +45,10 @@ public class InventoryEntity {
     }
 
 
-
     // Constructors,
-
     public InventoryEntity(){}
+
+
 
     public InventoryEntity(Long inventoryId, ProductEntity product, MbPEntity mbp, String batchNo, String stockStatus, LocalDateTime lastUpdated, List<BatchVariant> variants) {
         this.inventoryId = inventoryId;

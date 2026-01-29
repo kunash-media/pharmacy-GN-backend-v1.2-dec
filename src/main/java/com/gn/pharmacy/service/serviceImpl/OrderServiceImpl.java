@@ -1,5 +1,7 @@
 package com.gn.pharmacy.service.serviceImpl;
 
+import com.gn.pharmacy.dto.request.ExchangeDto;
+import com.gn.pharmacy.dto.request.ExchangeRequestDto;
 import com.gn.pharmacy.dto.request.OrderItemDto;
 import com.gn.pharmacy.dto.request.OrderRequestDto;
 import com.gn.pharmacy.dto.response.OrderResponseDto;
@@ -8,19 +10,16 @@ import com.gn.pharmacy.entity.*;
 import com.gn.pharmacy.repository.*;
 
 import com.gn.pharmacy.service.OrderService;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final MbPRepository mbpRepository;
+
 
     public OrderServiceImpl(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
                             ProductRepository productRepository, UserRepository userRepository, MbPRepository mbpRepository) {
@@ -436,6 +436,9 @@ public class OrderServiceImpl implements OrderService {
                         itemDto.setSubtotal(item.getSubtotal());
                         itemDto.setItemName(item.getItemName());
                         itemDto.setSize(item.getSize());
+                        itemDto.setExchanges(item.getExchanges().stream()
+                                .map(this::mapToExchangeDto)
+                                .collect(Collectors.toList()));
 
                         // === MAIN IMAGE URL LOGIC ===
                         String mainImageUrl = null;
@@ -567,5 +570,82 @@ public class OrderServiceImpl implements OrderService {
 
         logger.info("Order cancelled successfully with ID: {}", orderId);
         return mapToResponseDto(cancelledOrder);
+    }
+
+
+    private ExchangeDto mapToExchangeDto(Exchange exchange) {
+        ExchangeDto dto = new ExchangeDto();
+        dto.setMbProductId(exchange.getMbProductId());
+        dto.setUserId(exchange.getUserId());
+        dto.setOrderId(exchange.getOrderId());
+        dto.setExchangeReason(exchange.getExchangeReason());
+        dto.setExchangeSize(exchange.getExchangeSize());
+        dto.setProductSize(exchange.getProductSize());
+        dto.setExchangeStatus(exchange.getExchangeStatus());
+        dto.setExchanged(exchange.isExchanged());
+        return dto;
+    }
+
+
+
+
+    @Override
+    @Transactional
+    public OrderResponseDto requestExchange(Long orderItemId, ExchangeRequestDto exchangeRequestDto) {
+        logger.info("Requesting exchange for order item ID: {}", orderItemId);
+
+        OrderItemEntity item = orderItemRepository.findById(orderItemId)
+                .orElseThrow(() -> new RuntimeException("Order item not found with ID: " + orderItemId));
+
+        OrderEntity order = item.getOrder();
+
+        if (item.getMbP() == null) {
+            throw new RuntimeException("Exchanges are only available for MB products");
+        }
+
+        if ("CANCELLED".equals(order.getOrderStatus())) {
+            throw new RuntimeException("Cannot request exchange for cancelled order");
+        }
+
+        // Optional: Prevent exchange if already in some exchange-related status
+        if ("EXCHANGE_REQUESTED".equals(order.getOrderStatus()) ||
+                "EXCHANGE_APPROVED".equals(order.getOrderStatus())) {
+            throw new RuntimeException("Order is already in exchange process");
+        }
+
+        // Check if this specific item already has in-process exchange
+        boolean hasInProcess = item.getExchanges().stream()
+                .anyMatch(e -> "in-process".equals(e.getExchangeStatus()));
+        if (hasInProcess) {
+            throw new RuntimeException("An exchange is already in process for this item");
+        }
+
+        String originalSize = item.getSize();
+        if (exchangeRequestDto.getExchangeSize().equalsIgnoreCase(originalSize)) {
+            throw new RuntimeException("Exchange size must be different from the original size");
+        }
+
+        // Create and add the exchange entry
+        Exchange newExchange = new Exchange();
+        newExchange.setMbProductId(item.getMbP().getId());
+        newExchange.setUserId(order.getUser().getUserId());
+        newExchange.setOrderId(order.getOrderId());
+        newExchange.setExchangeReason(exchangeRequestDto.getExchangeReason());
+        newExchange.setExchangeSize(exchangeRequestDto.getExchangeSize());
+        newExchange.setProductSize(originalSize);
+        // exchangeStatus defaults to "in-process" via @Embeddable
+
+        item.getExchanges().add(newExchange);
+
+        // Update order status to reflect exchange request
+        order.setOrderStatus("EXCHANGE_REQUESTED");
+
+        // Save both (orderItem saves exchange via ElementCollection, order saves status)
+        orderItemRepository.save(item);   // cascades to order via relationship if needed
+        orderRepository.save(order);      // explicitly save order status change
+
+        logger.info("Exchange requested successfully for order item ID: {}. Order status updated to EXCHANGE_REQUESTED", orderItemId);
+
+        return getOrderById(order.getOrderId());
     }
 }

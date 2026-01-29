@@ -169,7 +169,6 @@ apidocs/
 # ===============================
 # Unit test reports
 **/test-output/
-**/reports/
 **/test-results/
 
 # Coverage

@@ -1,5 +1,6 @@
 package com.gn.pharmacy.controller;
 
+import com.gn.pharmacy.dto.request.ExchangeRequestDto;
 import com.gn.pharmacy.dto.request.OrderRequestDto;
 import com.gn.pharmacy.dto.response.OrderResponseDto;
 import com.gn.pharmacy.service.OrderService;
@@ -70,5 +71,15 @@ public class OrderController {
             Pageable pageable) {
         logger.info("Fetching orders for user ID: {}", userId);
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId, pageable));
+    }
+
+
+    // Add to OrderController.java
+    @PostMapping("/request-exchange/{orderItemId}")
+    public ResponseEntity<OrderResponseDto> requestExchange(
+            @PathVariable Long orderItemId,
+            @RequestBody ExchangeRequestDto exchangeRequestDto) {
+        logger.info("Received exchange request for order item ID: {}", orderItemId);
+        return ResponseEntity.ok(orderService.requestExchange(orderItemId, exchangeRequestDto));
     }
 }

@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/dashboard")
-
 public class DashboardController {
 
     @Autowired

@@ -525,4 +525,13 @@ public class MbPController {
             throw new IllegalArgumentException("Main image is required");
         }
     }
+
+    // ───────────────────────────────────────────────
+    // NEW ENDPOINT: Get available sizes for a MB product
+    // ───────────────────────────────────────────────
+    @GetMapping("/get-sizes-by-id/{id}")
+    public ResponseEntity<List<String>> getAvailableSizes(@PathVariable Long id) {
+        List<String> sizes = mbpService.getAvailableSizes(id);
+        return ResponseEntity.ok(sizes);
+    }
 }

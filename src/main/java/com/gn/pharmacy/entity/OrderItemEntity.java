@@ -2,6 +2,9 @@ package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "order_items")
 public class OrderItemEntity {
@@ -30,21 +33,28 @@ public class OrderItemEntity {
     @Column(name = "size_variant", length = 50)
     private String size;
 
+
+    // Add this field to the class:
+    @ElementCollection
+    @CollectionTable(name = "order_item_exchanges", joinColumns = @JoinColumn(name = "order_item_id"))
+    private List<Exchange> exchanges = new ArrayList<>();
+
     // Constructors
     public OrderItemEntity() {}
 
 
-    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product, MbPEntity mbP, int quantity, Double itemPrice, Double itemOldPrice, Double subtotal, String itemName, String size) {
+    public OrderItemEntity(Long orderItemId, OrderEntity order, ProductEntity product, MbPEntity mbP, int quantity, Double itemPrice, Double itemOldPrice, Double subtotal, String itemName, String size, List<Exchange> exchanges) {
         this.orderItemId = orderItemId;
         this.order = order;
         this.product = product;
-        this.MbP = mbP;
+        MbP = mbP;
         this.quantity = quantity;
         this.itemPrice = itemPrice;
         this.itemOldPrice = itemOldPrice;
         this.subtotal = subtotal;
         this.itemName = itemName;
         this.size = size;
+        this.exchanges = exchanges;
     }
 
     public Long getOrderItemId() {
@@ -125,5 +135,13 @@ public class OrderItemEntity {
 
     public void setSize(String size) {
         this.size = size;
+    }
+
+    public List<Exchange> getExchanges() {
+        return exchanges;
+    }
+
+    public void setExchanges(List<Exchange> exchanges) {
+        this.exchanges = exchanges;
     }
 }

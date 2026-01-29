@@ -63,4 +63,7 @@ public interface MbPService {
      */
     List<MbPResponseDto> getAllActiveProducts();
 
+
+    //get list of sizes
+    List<String> getAvailableSizes(Long mbpId);
 }
