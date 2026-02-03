@@ -22,7 +22,7 @@ public class ProductRequestDto {
     private List<BigDecimal> productOldPrice = new ArrayList<>();
 
     private String productStock = "In Stock";           // e.g., "In Stock", "Low Stock" — status string
-    private String productStatus;          // e.g., "ACTIVE", "INACTIVE"
+    private String productStatus = "Available";          // e.g., "ACTIVE", "INACTIVE"
     private String productDescription;
 
     private Integer productQuantity;       // Fallback total quantity (used if no sizeQuantities)
