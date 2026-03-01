@@ -9,6 +9,8 @@ public class BulkUploadResponse {
     private int skippedCount;
     private List<String> skippedReasons = new ArrayList<>();
 
+    private String message;
+
     // Getters and Setters
     public int getUploadedCount() {
         return uploadedCount;
@@ -32,5 +34,13 @@ public class BulkUploadResponse {
 
     public void setSkippedReasons(List<String> skippedReasons) {
         this.skippedReasons = skippedReasons;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }

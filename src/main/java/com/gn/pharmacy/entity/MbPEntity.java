@@ -51,7 +51,7 @@ public class MbPEntity {
     @ElementCollection
     @BatchSize(size = 50)
     @CollectionTable(name = "mbp_description", joinColumns = @JoinColumn(name = "mbp_id"))
-    @Column(name = "description_line")
+    @Column(name = "description_line", columnDefinition = "LONGTEXT")
     private List<String> description = new ArrayList<>();
 
     @ElementCollection
@@ -62,7 +62,7 @@ public class MbPEntity {
 
     @ElementCollection
     @CollectionTable(name = "mbp_features", joinColumns = @JoinColumn(name = "mbp_id"))
-    @Column(name = "feature")
+    @Column(name = "feature", columnDefinition = "LONGTEXT")
     @BatchSize(size = 50)
     private List<String> features = new ArrayList<>();
 
@@ -77,6 +77,7 @@ public class MbPEntity {
     @Column(columnDefinition = "LONGBLOB")
     private List<byte[]> productSubImages = new ArrayList<>();
 
+    @Column(columnDefinition = "LONGTEXT")
     private String specifications;
 
 

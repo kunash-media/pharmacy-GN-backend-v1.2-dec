@@ -1,7 +1,9 @@
 package com.gn.pharmacy.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLDelete;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -70,18 +72,22 @@ public class ProductEntity {
 
     @ElementCollection
     @CollectionTable(name = "product_benefits", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "benefit")
+    @Column(name = "benefit",columnDefinition = "LONGTEXT")
+    @Lob
     private List<String> benefitsList = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "product_ingredients", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "ingredient")
+    @Column(name = "ingredient", columnDefinition = "LONGTEXT")
+    @Lob
     private List<String> ingredientsList = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "product_directions", joinColumns = @JoinColumn(name = "product_id"))
-    @Column(name = "direction")
+    @Column(name = "direction", columnDefinition = "LONGTEXT")
+    @Lob
     private List<String> directionsList = new ArrayList<>();
+
 
     @Lob
     @Column(name = "product_main_img", columnDefinition = "LONGBLOB")

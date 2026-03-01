@@ -111,4 +111,5 @@ public interface MbPRepository extends JpaRepository<MbPEntity, Long>,
     List<MbPEntity> findByCategoryAndActive(@Param("category") String category);
 
 
+    boolean existsByTitle(String productName);
 }

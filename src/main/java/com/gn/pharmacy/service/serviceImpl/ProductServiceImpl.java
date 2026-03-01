@@ -1,5 +1,6 @@
 package com.gn.pharmacy.service.serviceImpl;
 
+import com.gn.pharmacy.dto.request.MbPRequestDto;
 import com.gn.pharmacy.dto.request.ProductPatchDto;
 import com.gn.pharmacy.dto.request.ProductRequestDto;
 import com.gn.pharmacy.dto.response.BulkUploadResponse;
@@ -9,8 +10,10 @@ import com.gn.pharmacy.entity.InventoryEntity;
 import com.gn.pharmacy.entity.ProductEntity;
 import com.gn.pharmacy.dto.response.BatchInfoDTO;
 import com.gn.pharmacy.repository.InventoryRepository;
+import com.gn.pharmacy.repository.MbPRepository;
 import com.gn.pharmacy.repository.ProductRepository;
 import com.gn.pharmacy.service.InventoryService;
+import com.gn.pharmacy.service.MbPService;
 import com.gn.pharmacy.service.ProductService;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -43,6 +46,13 @@ public class ProductServiceImpl implements ProductService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductServiceImpl.class);
     private final ProductRepository productRepository;
+
+
+    @Autowired
+    MbPRepository mbPRepository;
+
+    @Autowired
+    MbPService mbPService;
 
     @Autowired
     private InventoryService inventoryService;
@@ -428,11 +438,6 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("All product prices must be greater than zero");
         }
 
-        // Main image required only on create
-        if (isCreate && (dto.getProductMainImage() == null || dto.getProductMainImage().isEmpty())) {
-            throw new IllegalArgumentException("Product main image is required when creating a product");
-        }
-
         // Sizes and prices consistency
         List<String> sizes = dto.getProductSizes();
         List<BigDecimal> prices = dto.getProductPrice();
@@ -446,16 +451,8 @@ public class ProductServiceImpl implements ProductService {
                 throw new IllegalArgumentException("Number of old prices must match number of sizes");
             }
 
-            // Validate old > current where provided
-            if (oldPrices != null) {
-                for (int i = 0; i < prices.size(); i++) {
-                    BigDecimal current = prices.get(i);
-                    BigDecimal old = oldPrices.get(i);
-                    if (old != null && old.compareTo(current) <= 0) {
-                        throw new IllegalArgumentException("Old price must be greater than current price for size: " + sizes.get(i));
-                    }
-                }
-            }
+            // Removed: old price > current price validation
+            // (old prices can now be equal to or lower than current prices, or absent)
 
             // NEW: Validate per-size data if sizes exist
             if (dto.getSizeQuantities() == null || dto.getSizeQuantities().size() != sizes.size()) {
@@ -519,11 +516,282 @@ public class ProductServiceImpl implements ProductService {
 
     //======================= bulk upload =======================//
 
+//    @Override
+//    @Transactional
+//    public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
+//        logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
+//        logger.info("║ BULK PRODUCT UPLOAD STARTED ── {}", Instant.now());
+//        logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
+//
+//        // ─── Image map preparation ───
+//        Map<String, MultipartFile> imageMap = new HashMap<>();
+//        if (images != null && !images.isEmpty()) {
+//            logger.debug("Received {} product images", images.size());
+//            for (MultipartFile image : images) {
+//                String filename = image.getOriginalFilename();
+//                if (filename != null && !filename.trim().isEmpty()) {
+//                    String key = normalizeImageKey(filename);
+//                    imageMap.put(key, image);
+//                    logger.trace("Mapped image: {} → key={}", filename, key);
+//                }
+//            }
+//            logger.info("Successfully prepared {} image(s) for upload", imageMap.size());
+//        } else {
+//            logger.info("No product images provided");
+//        }
+//
+//        int uploadedCount = 0;
+//        int skippedCount = 0;
+//        List<String> skippedReasons = new ArrayList<>();
+//
+//        try (InputStream is = excelFile.getInputStream();
+//             Workbook workbook = new XSSFWorkbook(is)) {
+//
+//            Sheet sheet = workbook.getSheetAt(0);
+//            Row headerRow = sheet.getRow(0);
+//            if (headerRow == null) {
+//                logger.error("Excel file has no header row ── upload aborted");
+//                throw new IllegalArgumentException("Excel file has no header row");
+//            }
+//
+//            // ─── Column name → index mapping ───
+//            Map<String, Integer> colIndex = new HashMap<>();
+//            for (int i = 0; i < headerRow.getLastCellNum(); i++) {
+//                String header = getCellValue(headerRow.getCell(i))
+//                        .trim()
+//                        .toLowerCase()
+//                        .replaceAll("\\s+", " ");
+//                if (!header.isEmpty()) {
+//                    colIndex.put(header, i);
+//                }
+//            }
+//            logger.info("Detected {} columns in Excel sheet", colIndex.size());
+//            logger.debug("Column mapping: {}", colIndex);
+//
+//            // Required columns validation (main image no longer required)
+//            String[] required = {
+//                    "product name", "category", "sub category", "prices",
+//                    "sizes", "variant quantities"
+//            };
+//            List<String> missing = Arrays.stream(required)
+//                    .filter(req -> !colIndex.containsKey(req))
+//                    .toList();
+//            if (!missing.isEmpty()) {
+//                String msg = "Missing required column(s): " + String.join(", ", missing);
+//                logger.error(msg);
+//                throw new IllegalArgumentException(msg);
+//            }
+//
+//            Iterator<Row> iterator = sheet.rowIterator();
+//            iterator.next(); // skip header
+//            int rowNumber = 1;
+//
+//            while (iterator.hasNext()) {
+//                Row row = iterator.next();
+//                rowNumber++;
+//
+//                String productName = getCellValue(row.getCell(colIndex.get("product name"))).trim();
+//                if (productName.isEmpty()) {
+//                    skippedCount++;
+//                    String reason = "Skipped ── empty product name (row " + rowNumber + ")";
+//                    skippedReasons.add(reason);
+//                    logger.warn(reason);
+//                    continue;
+//                }
+//
+//                logger.info("Processing row {} ── Product: {}", rowNumber, productName);
+//
+//                String category = getCellValue(row.getCell(colIndex.get("category"))).trim();
+//                boolean isMb = category.equalsIgnoreCase("MotherCare") || category.equalsIgnoreCase("BabyCare");
+//
+//                // Duplicate check – different tables
+//                if (isMb) {
+//                    if (mbPRepository.existsByTitle(productName)) {
+//                        skippedCount++;
+//                        String reason = "Skipped ── duplicate MB product title: " + productName + " (row " + rowNumber + ")";
+//                        skippedReasons.add(reason);
+//                        logger.warn(reason);
+//                        continue;
+//                    }
+//                } else {
+//                    if (productRepository.existsByProductName(productName)) {
+//                        skippedCount++;
+//                        String reason = "Skipped ── duplicate product name: " + productName + " (row " + rowNumber + ")";
+//                        skippedReasons.add(reason);
+//                        logger.warn(reason);
+//                        continue;
+//                    }
+//                }
+//
+//                // ─── Common parsing ───
+//                String sku = getCellValue(row.getCell(colIndex.get("sku"))).trim();
+//                String subCategory = getCellValue(row.getCell(colIndex.get("sub category"))).trim();
+//
+//                List<String> sizes = parseSemicolonList(row.getCell(colIndex.get("sizes")));
+//
+//                List<BigDecimal> prices = parseDecimalList(row.getCell(colIndex.get("prices")));
+//                List<BigDecimal> oldPrices = parseDecimalList(row.getCell(colIndex.get("old prices")));
+//
+//                // Handle empty old prices → copy from prices
+//                if (oldPrices.isEmpty() && !prices.isEmpty()) {
+//                    oldPrices = new ArrayList<>(prices);
+//                }
+//
+//                autoExpand(sizes, prices, "price", productName);
+//                autoExpand(sizes, oldPrices, "old price", productName);
+//
+//                // If old price < current price → treat as current (as per your rule)
+//                for (int i = 0; i < prices.size(); i++) {
+//                    BigDecimal p = prices.get(i);
+//                    BigDecimal o = oldPrices.get(i);
+//                    if (o.compareTo(p) < 0) {
+//                        oldPrices.set(i, p);
+//                    }
+//                }
+//
+//                List<Integer> qtyList = parseIntegerList(row.getCell(colIndex.get("variant quantities")));
+//                autoExpand(sizes, qtyList, "quantity", productName);
+//
+//                Map<String, Integer> sizeQuantities = new LinkedHashMap<>();
+//                for (int i = 0; i < sizes.size(); i++) {
+//                    sizeQuantities.put(sizes.get(i), qtyList.get(i));
+//                }
+//
+//                String brandName = getOptionalString(row, colIndex, "brand", null);
+//                boolean prescriptionRequired = getOptionalBoolean(row, colIndex, "prescription", false);
+//
+//                List<String> benefitsList = parseSemicolonList(row.getCell(colIndex.get("benefits")));
+//                List<String> ingredientsList = parseSemicolonList(row.getCell(colIndex.get("ingredients")));
+//                List<String> directionsList = parseSemicolonList(row.getCell(colIndex.get("directions")));
+//
+//                Map<String, String> sizeMfgDates = buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("mfg dates"))));
+//                Map<String, String> sizeExpDates = buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("exp dates"))));
+//
+//                String batchNo = "";
+//                List<String> batchList = parseSemicolonList(row.getCell(colIndex.get("batch no")));
+//                if (!batchList.isEmpty()) {
+//                    batchNo = batchList.stream()
+//                            .filter(s -> !s.trim().isEmpty())
+//                            .findFirst()
+//                            .orElse("");
+//                }
+//
+//                Map<String, String> dynamicFields = parseDynamicFields(row, colIndex);
+//
+//                // ─── Images – now fully optional ───
+//                String mainImageName = getCellValue(row.getCell(colIndex.get("main image"))).trim();
+//                MultipartFile mainImage = null;
+//                if (!mainImageName.isEmpty()) {
+//                    mainImage = imageMap.get(normalizeImageKey(mainImageName));
+//                    if (mainImage == null) {
+//                        logger.warn("Main image file not found in uploaded files: '{}' for product '{}'", mainImageName, productName);
+//                        // → No skip — proceed with null main image
+//                    }
+//                }
+//
+//                List<MultipartFile> subImages = new ArrayList<>();
+//                for (String imgName : parseSemicolonList(row.getCell(colIndex.get("sub images")))) {
+//                    String key = normalizeImageKey(imgName);
+//                    MultipartFile f = imageMap.get(key);
+//                    if (f != null) {
+//                        subImages.add(f);
+//                    } else if (!imgName.trim().isEmpty()) {
+//                        logger.warn("Sub image file not found: '{}' for product '{}'", imgName, productName);
+//                        // → Warning only, no skip
+//                    }
+//                }
+//
+//                // ─── Create product based on type ───
+//                try {
+//                    if (isMb) {
+//                        MbPRequestDto mbDto = new MbPRequestDto();
+//                        mbDto.setSku(sku);
+//                        mbDto.setTitle(productName);
+//                        mbDto.setCategory(category);
+//                        mbDto.setSubCategory(subCategory);
+//                        mbDto.setPrice(prices.stream().map(BigDecimal::doubleValue).collect(Collectors.toList()));
+//                        mbDto.setOriginalPrice(oldPrices.stream().map(BigDecimal::doubleValue).collect(Collectors.toList()));
+//                        mbDto.setBrand(brandName);
+//                        mbDto.setInStock(sizeQuantities.values().stream().mapToInt(Integer::intValue).sum() > 0);
+//                        mbDto.setDescription(directionsList); // directions → description
+//                        mbDto.setFeatures(benefitsList);
+//                        mbDto.setProductSizes(sizes);
+//                        mbDto.setSizeQuantities(sizeQuantities);
+//                        mbDto.setSizeMfgDates(sizeMfgDates);
+//                        mbDto.setSizeExpDates(sizeExpDates);
+//                        mbDto.setBatchNo(batchNo);
+//                        mbDto.setMainImage(mainImage);
+//                        mbDto.setSubImages(subImages);
+//                        mbDto.setApproved(true);
+//
+//                        mbPService.createMbProduct(mbDto);
+//                        logger.info("→ SUCCESS: MB Product created ── {} (row {})", productName, rowNumber);
+//                    } else {
+//                        ProductRequestDto pDto = new ProductRequestDto();
+//                        pDto.setSku(sku);
+//                        pDto.setProductName(productName);
+//                        pDto.setProductCategory(category);
+//                        pDto.setProductSubCategory(subCategory);
+//                        pDto.setProductPrice(prices);
+//                        pDto.setProductOldPrice(oldPrices);
+//                        pDto.setPrescriptionRequired(prescriptionRequired);
+//                        pDto.setBrandName(brandName);
+//                        pDto.setBenefitsList(benefitsList);
+//                        pDto.setIngredientsList(ingredientsList);
+//                        pDto.setDirectionsList(directionsList);
+//                        pDto.setProductDescription(String.join("\n", directionsList)); // or join with "; "
+//                        pDto.setSizeQuantities(sizeQuantities);
+//                        pDto.setSizeMfgDates(sizeMfgDates);
+//                        pDto.setSizeExpDates(sizeExpDates);
+//                        pDto.setBatchNo(batchNo);
+//                        pDto.setProductDynamicFields(dynamicFields);
+//                        pDto.setProductSizes(sizes);
+//                        pDto.setProductMainImage(mainImage);
+//                        pDto.setProductSubImages(subImages);
+//                        pDto.setApproved(true);
+//
+//                        createProduct(pDto);
+//                        logger.info("→ SUCCESS: Regular Product created ── {} (row {})", productName, rowNumber);
+//                    }
+//                    uploadedCount++;
+//                } catch (Exception e) {
+//                    skippedCount++;
+//                    String reason = "Failed to create '" + productName + "' (row " + rowNumber + "): " + e.getMessage();
+//                    skippedReasons.add(reason);
+//                    logger.error("→ FAILURE: {}", reason, e);
+//                }
+//            }
+//        } catch (Exception e) {
+//            logger.error("CRITICAL ERROR during bulk upload processing ── aborting", e);
+//            throw e;
+//        }
+//
+//        logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
+//        logger.info("║ BULK PRODUCT UPLOAD FINISHED ── {}", Instant.now());
+//        logger.info("║ Uploaded: {} Skipped: {} Total processed: {}",
+//                uploadedCount, skippedCount, (uploadedCount + skippedCount));
+//        logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
+//
+//        BulkUploadResponse response = new BulkUploadResponse();
+//        response.setUploadedCount(uploadedCount);
+//        response.setSkippedCount(skippedCount);
+//        response.setSkippedReasons(skippedReasons);
+//        return response;
+//    }
+
+
+
     @Override
+    @Transactional
     public BulkUploadResponse bulkCreateProducts(MultipartFile excelFile, List<MultipartFile> images) throws Exception {
         logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
-        logger.info("║              BULK PRODUCT UPLOAD STARTED ── {}", Instant.now());
+        logger.info("║ BULK PRODUCT UPLOAD STARTED ── {}", Instant.now());
         logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
+
+        BulkUploadResponse response = new BulkUploadResponse();
+        List<String> skippedReasons = new ArrayList<>();
+        int uploadedCount = 0;
+        int skippedCount = 0;
 
         // ─── Image map preparation ───
         Map<String, MultipartFile> imageMap = new HashMap<>();
@@ -542,18 +810,16 @@ public class ProductServiceImpl implements ProductService {
             logger.info("No product images provided");
         }
 
-        int uploadedCount = 0;
-        int skippedCount = 0;
-        List<String> skippedReasons = new ArrayList<>();
-
         try (InputStream is = excelFile.getInputStream();
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
             Row headerRow = sheet.getRow(0);
             if (headerRow == null) {
-                logger.error("Excel file has no header row ── upload aborted");
-                throw new IllegalArgumentException("Excel file has no header row");
+                skippedReasons.add("Excel file has no header row");
+                response.setSkippedReasons(skippedReasons);
+                response.setMessage("Upload failed - Excel file has no header row");
+                return response;
             }
 
             // ─── Column name → index mapping ───
@@ -567,168 +833,241 @@ public class ProductServiceImpl implements ProductService {
                     colIndex.put(header, i);
                 }
             }
-
             logger.info("Detected {} columns in Excel sheet", colIndex.size());
             logger.debug("Column mapping: {}", colIndex);
 
-            // Required columns validation
+            // Required columns validation (main image no longer required)
             String[] required = {
-                    "product name", "category", "sub category", "prices", "old prices",
+                    "product name", "category", "sub category", "prices",
                     "sizes", "variant quantities"
             };
             List<String> missing = Arrays.stream(required)
                     .filter(req -> !colIndex.containsKey(req))
                     .toList();
-
             if (!missing.isEmpty()) {
                 String msg = "Missing required column(s): " + String.join(", ", missing);
-                logger.error(msg);
-                throw new IllegalArgumentException(msg);
+                skippedReasons.add(msg);
+                response.setSkippedReasons(skippedReasons);
+                response.setMessage("Upload failed - missing required columns in Excel");
+                return response;
             }
 
             Iterator<Row> iterator = sheet.rowIterator();
             iterator.next(); // skip header
-
             int rowNumber = 1;
 
             while (iterator.hasNext()) {
                 Row row = iterator.next();
                 rowNumber++;
 
-                String productName = getCellValue(row.getCell(colIndex.get("product name"))).trim();
-                if (productName.isEmpty()) {
-                    skippedCount++;
-                    String reason = "Skipped ── empty product name (row " + rowNumber + ")";
-                    skippedReasons.add(reason);
-                    logger.warn(reason);
-                    continue;
-                }
-
-                logger.info("Processing row {} ── Product: {}", rowNumber, productName);
-
-                if (productRepository.existsByProductName(productName)) {
-                    skippedCount++;
-                    String reason = "Skipped ── duplicate product name: " + productName + " (row " + rowNumber + ")";
-                    skippedReasons.add(reason);
-                    logger.warn(reason);
-                    continue;
-                }
-
-                ProductRequestDto dto = new ProductRequestDto();
-                dto.setProductName(productName);
-                dto.setProductCategory(getCellValue(row.getCell(colIndex.get("category"))));
-                dto.setProductSubCategory(getCellValue(row.getCell(colIndex.get("sub category"))));
-                dto.setSku(getCellValue(row.getCell(colIndex.get("sku"))));
-
-                // Sizes
-                List<String> sizes = parseSemicolonList(row.getCell(colIndex.get("sizes")));
-                dto.setProductSizes(sizes);
-
-                // Prices & Old Prices
-                List<BigDecimal> prices = parseDecimalList(row.getCell(colIndex.get("prices")));
-                List<BigDecimal> oldPrices = parseDecimalList(row.getCell(colIndex.get("old prices")));
-                autoExpand(sizes, prices, "price", productName);
-                autoExpand(sizes, oldPrices, "old price", productName);
-                dto.setProductPrice(prices);
-                dto.setProductOldPrice(oldPrices);
-
-                // Variant Quantities
-                List<Integer> qtyList = parseIntegerList(row.getCell(colIndex.get("variant quantities")));
-                autoExpand(sizes, qtyList, "quantity", productName);
-                Map<String, Integer> sizeQuantities = new LinkedHashMap<>();
-                for (int i = 0; i < sizes.size(); i++) {
-                    sizeQuantities.put(sizes.get(i), qtyList.get(i));
-                }
-                dto.setSizeQuantities(sizeQuantities);
-
-                // Optional fields with defaults
-                dto.setPrescriptionRequired(getOptionalBoolean(row, colIndex, "prescription", false));
-                dto.setBrandName(getOptionalString(row, colIndex, "brand", null));
-
-                dto.setSizeMfgDates(buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("mfg dates")))));
-                dto.setSizeExpDates(buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("exp dates")))));
-
-                // Batch No – take first non-empty value (no duplication)
-                String batchNo = "";
-                List<String> batchList = parseSemicolonList(row.getCell(colIndex.get("batch no")));
-                if (!batchList.isEmpty()) {
-                    batchNo = batchList.stream()
-                            .filter(s -> !s.trim().isEmpty())
-                            .findFirst()
-                            .orElse("");
-                }
-                dto.setBatchNo(batchNo);
-
-                dto.setBenefitsList(parseSemicolonList(row.getCell(colIndex.get("benefits"))));
-                dto.setDirectionsList(parseSemicolonList(row.getCell(colIndex.get("directions"))));
-                dto.setIngredientsList(parseSemicolonList(row.getCell(colIndex.get("ingredients"))));
-
-                dto.setProductDynamicFields(parseDynamicFields(row, colIndex));
-
-                // IMPORTANT: Default approval for bulk upload
-                dto.setApproved(true);
-
-                // ─── Images ───
-                String mainImageName = getCellValue(row.getCell(colIndex.get("main image"))).trim();
-                MultipartFile mainImage = mainImageName.isEmpty() ? null : imageMap.get(normalizeImageKey(mainImageName));
-                if (mainImage == null && !mainImageName.isEmpty()) {
-                    String reason = "Skipped ── missing main image '" + mainImageName + "' for " + productName;
-                    skippedCount++;
-                    skippedReasons.add(reason);
-                    logger.warn(reason);
-                    continue;
-                }
-                dto.setProductMainImage(mainImage);
-
-                List<MultipartFile> subImages = new ArrayList<>();
-                for (String imgName : parseSemicolonList(row.getCell(colIndex.get("sub images")))) {
-                    String key = normalizeImageKey(imgName);
-                    MultipartFile f = imageMap.get(key);
-                    if (f != null) {
-                        subImages.add(f);
-                    } else if (!imgName.trim().isEmpty()) {
-                        String reason = "Missing sub image '" + imgName + "' for " + productName;
+                try {
+                    String productName = getCellValue(row.getCell(colIndex.get("product name"))).trim();
+                    if (productName.isEmpty()) {
+                        skippedCount++;
+                        String reason = "Skipped ── empty product name (row " + rowNumber + ")";
                         skippedReasons.add(reason);
                         logger.warn(reason);
+                        continue;
                     }
-                }
-                dto.setProductSubImages(subImages);
 
-                // Debug final DTO state before creation
-                logger.debug("Creating product '{}' | approved={} | sizes={} | prices={} | batch='{}'",
-                        productName, dto.isApproved(), dto.getProductSizes(), dto.getProductPrice(), dto.getBatchNo());
+                    logger.info("Processing row {} ── Product: {}", rowNumber, productName);
 
-                // Create product
-                try {
-                    createProduct(dto);
+                    String category = getCellValue(row.getCell(colIndex.get("category"))).trim();
+                    boolean isMb = category.equalsIgnoreCase("MotherCare") || category.equalsIgnoreCase("BabyCare");
+
+                    // Duplicate check – different tables
+                    if (isMb) {
+                        if (mbPRepository.existsByTitle(productName)) {
+                            skippedCount++;
+                            String reason = "Skipped ── duplicate MB product title: " + productName + " (row " + rowNumber + ")";
+                            skippedReasons.add(reason);
+                            logger.warn(reason);
+                            continue;
+                        }
+                    } else {
+                        if (productRepository.existsByProductName(productName)) {
+                            skippedCount++;
+                            String reason = "Skipped ── duplicate product name: " + productName + " (row " + rowNumber + ")";
+                            skippedReasons.add(reason);
+                            logger.warn(reason);
+                            continue;
+                        }
+                    }
+
+                    // ─── Common parsing ───
+                    String sku = getCellValue(row.getCell(colIndex.get("sku"))).trim();
+                    String subCategory = getCellValue(row.getCell(colIndex.get("sub category"))).trim();
+
+                    List<String> sizes = parseSemicolonList(row.getCell(colIndex.get("sizes")));
+
+                    List<BigDecimal> prices = parseDecimalList(row.getCell(colIndex.get("prices")));
+                    List<BigDecimal> oldPrices = parseDecimalList(row.getCell(colIndex.get("old prices")));
+
+                    // Handle empty old prices → copy from prices
+                    if (oldPrices.isEmpty() && !prices.isEmpty()) {
+                        oldPrices = new ArrayList<>(prices);
+                    }
+
+                    autoExpand(sizes, prices, "price", productName);
+                    autoExpand(sizes, oldPrices, "old price", productName);
+
+                    // If old price < current price → treat as current (as per your rule)
+                    for (int i = 0; i < prices.size(); i++) {
+                        BigDecimal p = prices.get(i);
+                        BigDecimal o = oldPrices.get(i);
+                        if (o.compareTo(p) < 0) {
+                            oldPrices.set(i, p);
+                        }
+                    }
+
+                    List<Integer> qtyList = parseIntegerList(row.getCell(colIndex.get("variant quantities")));
+                    autoExpand(sizes, qtyList, "quantity", productName);
+
+                    Map<String, Integer> sizeQuantities = new LinkedHashMap<>();
+                    for (int i = 0; i < sizes.size(); i++) {
+                        sizeQuantities.put(sizes.get(i), qtyList.get(i));
+                    }
+
+                    String brandName = getOptionalString(row, colIndex, "brand", null);
+                    boolean prescriptionRequired = getOptionalBoolean(row, colIndex, "prescription", false);
+
+                    List<String> benefitsList = parseSemicolonList(row.getCell(colIndex.get("benefits")));
+                    List<String> ingredientsList = parseSemicolonList(row.getCell(colIndex.get("ingredients")));
+                    List<String> directionsList = parseSemicolonList(row.getCell(colIndex.get("directions")));
+
+                    Map<String, String> sizeMfgDates = buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("mfg dates"))));
+                    Map<String, String> sizeExpDates = buildOptionalSizeMap(sizes, parseSemicolonList(row.getCell(colIndex.get("exp dates"))));
+
+                    String batchNo = "";
+                    List<String> batchList = parseSemicolonList(row.getCell(colIndex.get("batch no")));
+                    if (!batchList.isEmpty()) {
+                        batchNo = batchList.stream()
+                                .filter(s -> !s.trim().isEmpty())
+                                .findFirst()
+                                .orElse("");
+                    }
+
+                    Map<String, String> dynamicFields = parseDynamicFields(row, colIndex);
+
+                    // ─── Images – now fully optional ───
+                    String mainImageName = getCellValue(row.getCell(colIndex.get("main image"))).trim();
+                    MultipartFile mainImage = null;
+                    if (!mainImageName.isEmpty()) {
+                        mainImage = imageMap.get(normalizeImageKey(mainImageName));
+                        if (mainImage == null) {
+                            logger.warn("Main image file not found in uploaded files: '{}' for product '{}'", mainImageName, productName);
+                            // → No skip — proceed with null main image
+                        }
+                    }
+
+                    List<MultipartFile> subImages = new ArrayList<>();
+                    for (String imgName : parseSemicolonList(row.getCell(colIndex.get("sub images")))) {
+                        String key = normalizeImageKey(imgName);
+                        MultipartFile f = imageMap.get(key);
+                        if (f != null) {
+                            subImages.add(f);
+                        } else if (!imgName.trim().isEmpty()) {
+                            logger.warn("Sub image file not found: '{}' for product '{}'", imgName, productName);
+                            // → Warning only, no skip
+                        }
+                    }
+
+                    // ─── Create product based on type ───
+                    if (isMb) {
+                        MbPRequestDto mbDto = new MbPRequestDto();
+                        mbDto.setSku(sku);
+                        mbDto.setTitle(productName);
+                        mbDto.setCategory(category);
+                        mbDto.setSubCategory(subCategory);
+                        mbDto.setPrice(prices.stream().map(BigDecimal::doubleValue).collect(Collectors.toList()));
+                        mbDto.setOriginalPrice(oldPrices.stream().map(BigDecimal::doubleValue).collect(Collectors.toList()));
+                        mbDto.setBrand(brandName);
+                        mbDto.setInStock(sizeQuantities.values().stream().mapToInt(Integer::intValue).sum() > 0);
+                        mbDto.setDescription(directionsList); // directions → description
+                        mbDto.setFeatures(benefitsList);
+                        mbDto.setProductSizes(sizes);
+                        mbDto.setSizeQuantities(sizeQuantities);
+                        mbDto.setSizeMfgDates(sizeMfgDates);
+                        mbDto.setSizeExpDates(sizeExpDates);
+                        mbDto.setBatchNo(batchNo);
+                        mbDto.setMainImage(mainImage);
+                        mbDto.setSubImages(subImages);
+                        mbDto.setApproved(true);
+
+                        mbPService.createMbProduct(mbDto);
+                        logger.info("→ SUCCESS: MB Product created ── {} (row {})", productName, rowNumber);
+                    } else {
+                        ProductRequestDto pDto = new ProductRequestDto();
+                        pDto.setSku(sku);
+                        pDto.setProductName(productName);
+                        pDto.setProductCategory(category);
+                        pDto.setProductSubCategory(subCategory);
+                        pDto.setProductPrice(prices);
+                        pDto.setProductOldPrice(oldPrices);
+                        pDto.setPrescriptionRequired(prescriptionRequired);
+                        pDto.setBrandName(brandName);
+                        pDto.setBenefitsList(benefitsList);
+                        pDto.setIngredientsList(ingredientsList);
+                        pDto.setDirectionsList(directionsList);
+                        pDto.setProductDescription(String.join("\n", directionsList)); // or join with "; "
+                        pDto.setSizeQuantities(sizeQuantities);
+                        pDto.setSizeMfgDates(sizeMfgDates);
+                        pDto.setSizeExpDates(sizeExpDates);
+                        pDto.setBatchNo(batchNo);
+                        pDto.setProductDynamicFields(dynamicFields);
+                        pDto.setProductSizes(sizes);
+                        pDto.setProductMainImage(mainImage);
+                        pDto.setProductSubImages(subImages);
+                        pDto.setApproved(true);
+
+                        createProduct(pDto);
+                        logger.info("→ SUCCESS: Regular Product created ── {} (row {})", productName, rowNumber);
+                    }
                     uploadedCount++;
-                    logger.info("→ SUCCESS: Product created ── {} (row {})", productName, rowNumber);
                 } catch (Exception e) {
                     skippedCount++;
-                    String reason = "Failed to create '" + productName + "' (row " + rowNumber + "): " + e.getMessage();
+                    String reason = "Failed to create '" + getCellValue(row.getCell(colIndex.get("product name"))).trim()
+                            + "' (row " + rowNumber + "): " + e.getMessage();
                     skippedReasons.add(reason);
                     logger.error("→ FAILURE: {}", reason, e);
                 }
             }
 
         } catch (Exception e) {
+            // Critical errors: cannot read file, invalid xlsx, etc.
+            String msg = "Cannot process the uploaded Excel file: " + e.getMessage();
+            skippedReasons.add(msg);
+            skippedReasons.add("Please make sure it's a valid .xlsx file and try again.");
+            response.setMessage("Upload failed - problem reading Excel file");
+            response.setSkippedReasons(skippedReasons);
             logger.error("CRITICAL ERROR during bulk upload processing ── aborting", e);
-            throw e;
+            return response;
         }
 
         logger.info("╔══════════════════════════════════════════════════════════════════════════════╗");
-        logger.info("║              BULK PRODUCT UPLOAD FINISHED ── {}", Instant.now());
-        logger.info("║  Uploaded: {}    Skipped: {}    Total processed: {}",
+        logger.info("║ BULK PRODUCT UPLOAD FINISHED ── {}", Instant.now());
+        logger.info("║ Uploaded: {} Skipped: {} Total processed: {}",
                 uploadedCount, skippedCount, (uploadedCount + skippedCount));
         logger.info("╚══════════════════════════════════════════════════════════════════════════════╝");
 
-        BulkUploadResponse response = new BulkUploadResponse();
         response.setUploadedCount(uploadedCount);
         response.setSkippedCount(skippedCount);
         response.setSkippedReasons(skippedReasons);
 
+        if (uploadedCount == 0 && skippedCount > 0) {
+            response.setMessage("No products were uploaded - please check the issues listed above");
+        } else if (skippedCount > 0) {
+            response.setMessage("Upload completed - some products were skipped");
+        } else {
+            response.setMessage("All products uploaded successfully");
+        }
+
         return response;
     }
+
+
+
+
 
     // ────────────────────────────────────────────────────────────────────────────────
 //  NEW: Unified semicolon-based list parser (used everywhere)
